@@ -1,0 +1,19 @@
+# Maven
+target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Quarkus
+.quarkus/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude memory (local-only)
+.claude/

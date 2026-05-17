@@ -1,0 +1,140 @@
+version: "3.9"
+
+# ──────────────────────────────────────────────
+# fast-saas-quarkus full-stack compose
+# Run after: mvn package -DskipTests
+# ──────────────────────────────────────────────
+
+services:
+
+  # ── Databases ─────────────────────────────
+
+  postgres-dispatch:
+    image: postgres:16-alpine
+    container_name: postgres-dispatch
+    environment:
+      POSTGRES_DB: dispatch
+      POSTGRES_USER: dispatch
+      POSTGRES_PASSWORD: dispatch_pass
+    volumes:
+      - postgres-dispatch-data:/var/lib/postgresql/data
+    networks:
+      - saas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dispatch -d dispatch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  postgres-shard1:
+    image: postgres:16-alpine
+    container_name: postgres-shard1
+    environment:
+      POSTGRES_DB: cluster
+      POSTGRES_USER: cluster
+      POSTGRES_PASSWORD: cluster_pass
+    volumes:
+      - postgres-shard1-data:/var/lib/postgresql/data
+    networks:
+      - saas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cluster -d cluster"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  postgres-shard2:
+    image: postgres:16-alpine
+    container_name: postgres-shard2
+    environment:
+      POSTGRES_DB: cluster
+      POSTGRES_USER: cluster
+      POSTGRES_PASSWORD: cluster_pass
+    volumes:
+      - postgres-shard2-data:/var/lib/postgresql/data
+    networks:
+      - saas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cluster -d cluster"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  # ── Backend services ───────────────────────
+
+  dispatch-service:
+    build:
+      context: .
+      dockerfile: dispatch-service/Dockerfile
+    container_name: dispatch-service
+    ports:
+      - "8080:8080"
+    environment:
+      DISPATCH_DB_URL: jdbc:postgresql://postgres-dispatch:5432/dispatch
+      DISPATCH_DB_USER: dispatch
+      DISPATCH_DB_PASS: dispatch_pass
+      JWT_SECRET: change-this-in-production-use-at-least-256-bit-key
+      CORS_ORIGINS: http://localhost:4200,http://localhost:4201
+      AUTH_PROVIDER: native
+    depends_on:
+      postgres-dispatch:
+        condition: service_healthy
+    networks:
+      - saas-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/q/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    restart: unless-stopped
+
+  cluster-sample:
+    build:
+      context: .
+      dockerfile: cluster-sample/Dockerfile
+    container_name: cluster-sample
+    ports:
+      - "8081:8081"
+    environment:
+      CLUSTER_ID: cluster-1
+      CLUSTER_NAME: "Sample Cluster 1"
+      DISPATCH_URL: http://dispatch-service:8080
+      JWT_SECRET: change-this-in-production-use-at-least-256-bit-key
+      SHARD1_DB_URL: jdbc:postgresql://postgres-shard1:5432/cluster
+      SHARD1_DB_USER: cluster
+      SHARD1_DB_PASS: cluster_pass
+      SHARD2_DB_URL: jdbc:postgresql://postgres-shard2:5432/cluster
+      SHARD2_DB_USER: cluster
+      SHARD2_DB_PASS: cluster_pass
+    depends_on:
+      postgres-shard1:
+        condition: service_healthy
+      postgres-shard2:
+        condition: service_healthy
+      dispatch-service:
+        condition: service_started
+    networks:
+      - saas-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/q/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  postgres-dispatch-data:
+  postgres-shard1-data:
+  postgres-shard2-data:
+
+networks:
+  saas-network:
+    driver: bridge

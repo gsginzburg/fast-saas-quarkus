@@ -1,0 +1,90 @@
+version: "3.9"
+
+# ──────────────────────────────────────────────────────────────────────────
+# fast-saas-quarkus dev-mode override
+#
+# Starts only the infrastructure (databases) so you can run each service
+# locally with 'mvn quarkus:dev'.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# Connection strings for local development:
+#   dispatch-service  → jdbc:postgresql://localhost:5432/dispatch   (user: dispatch   / pass: dispatch_pass)
+#   cluster shard 1   → jdbc:postgresql://localhost:5433/cluster    (user: cluster    / pass: cluster_pass)
+#   cluster shard 2   → jdbc:postgresql://localhost:5434/cluster    (user: cluster    / pass: cluster_pass)
+# ──────────────────────────────────────────────────────────────────────────
+
+services:
+
+  postgres-dispatch:
+    image: postgres:16-alpine
+    container_name: postgres-dispatch-dev
+    environment:
+      POSTGRES_DB: dispatch
+      POSTGRES_USER: dispatch
+      POSTGRES_PASSWORD: dispatch_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-dispatch-data:/var/lib/postgresql/data
+    networks:
+      - saas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dispatch -d dispatch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  postgres-shard1:
+    image: postgres:16-alpine
+    container_name: postgres-shard1-dev
+    environment:
+      POSTGRES_DB: cluster
+      POSTGRES_USER: cluster
+      POSTGRES_PASSWORD: cluster_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-shard1-data:/var/lib/postgresql/data
+    networks:
+      - saas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cluster -d cluster"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  postgres-shard2:
+    image: postgres:16-alpine
+    container_name: postgres-shard2-dev
+    environment:
+      POSTGRES_DB: cluster
+      POSTGRES_USER: cluster
+      POSTGRES_PASSWORD: cluster_pass
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-shard2-data:/var/lib/postgresql/data
+    networks:
+      - saas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cluster -d cluster"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  postgres-dispatch-data:
+  postgres-shard1-data:
+  postgres-shard2-data:
+
+networks:
+  saas-network:
+    driver: bridge
