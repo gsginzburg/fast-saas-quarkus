@@ -27,7 +27,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.gsginzburg.dispatch.config.DispatchConfig;
 import org.gsginzburg.shared.security.JwtClaims;
 import org.gsginzburg.shared.security.JwtService;
-import org.gsginzburg.shared.security.TokenType;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +35,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @ApplicationScoped
@@ -56,7 +56,6 @@ public class DispatchJwtService implements JwtService {
     @Override
     public String generateToken(JwtClaims claims) {
         Map<String, Object> extra = new HashMap<>();
-        if (claims.type() != null)       extra.put("type", claims.type().name());
         if (claims.tenantId() != null)   extra.put("tenant_id", claims.tenantId());
         if (claims.clusterUrl() != null) extra.put("cluster_url", claims.clusterUrl());
         if (claims.clusterId() != null)  extra.put("cluster_id", claims.clusterId());
@@ -64,6 +63,7 @@ public class DispatchJwtService implements JwtService {
         if (claims.roles() != null)      extra.put("roles", claims.roles());
 
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(claims.sub())
                 .issuer(issuer)
                 .issuedAt(Date.from(claims.issuedAt() != null ? claims.issuedAt() : Instant.now()))
@@ -84,7 +84,6 @@ public class DispatchJwtService implements JwtService {
         return JwtClaims.builder()
                 .sub(body.getSubject())
                 .iss(body.getIssuer())
-                .type(body.get("type") != null ? TokenType.valueOf((String) body.get("type")) : null)
                 .tenantId((String) body.get("tenant_id"))
                 .clusterUrl((String) body.get("cluster_url"))
                 .clusterId((String) body.get("cluster_id"))

@@ -14,10 +14,20 @@
  * limitations under the License.
  */
 
-package org.gsginzburg.shared.security;
+package org.gsginzburg.cluster.framework.security;
 
-public enum TokenType {
-    BACKOFFICE,
-    TENANT_EXCHANGE,
-    CLUSTER_SESSION
-}
+import java.util.List;
+
+public record ValidatedToken(
+        String userId,
+        String email,
+        String firstName,
+        String lastName,
+        String userType,
+        String tenantId,
+        String tenantName,
+        String tenantStatus,
+        String clusterName,
+        String clusterUrl,
+        List<String> roles
+) {}

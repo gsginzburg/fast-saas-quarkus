@@ -1,0 +1,153 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex justify-content-between align-items-center mb-4">
+  <h2 class="m-0">Users</h2>
+  <p-button label="New User" icon="pi pi-plus" (click)="openCreateDialog()" />
+</div>
+
+<p-table
+  [value]="users()"
+  [loading]="loading()"
+  [paginator]="true"
+  [rows]="pageSize"
+  [totalRecords]="totalRecords()"
+  [lazy]="true"
+  (onLazyLoad)="onLazyLoad($event)"
+  responsiveLayout="scroll"
+  styleClass="p-datatable-gridlines"
+>
+  <ng-template pTemplate="header">
+    <tr>
+      <th>Email</th>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Status</th>
+      <th>Created</th>
+      <th style="width: 10rem">Actions</th>
+    </tr>
+  </ng-template>
+  <ng-template pTemplate="body" let-user>
+    <tr>
+      <td class="font-medium">{{ user.email }}</td>
+      <td>{{ user.firstName }} {{ user.lastName }}</td>
+      <td>
+        <p-tag
+          [value]="user.userType"
+          [severity]="user.userType === 'BACKOFFICE' ? 'info' : 'secondary'"
+        />
+      </td>
+      <td>
+        <p-tag
+          [value]="user.status"
+          [severity]="statusSeverity(user.status)"
+        />
+      </td>
+      <td>{{ user.createdAt | date: 'short' }}</td>
+      <td>
+        <p-button
+          [icon]="user.status === 'ACTIVE' ? 'pi pi-ban' : 'pi pi-check-circle'"
+          [rounded]="true"
+          [text]="true"
+          [severity]="user.status === 'ACTIVE' ? 'warn' : 'success'"
+          (click)="toggleStatus(user)"
+          [pTooltip]="user.status === 'ACTIVE' ? 'Deactivate' : 'Activate'"
+        />
+        <p-button
+          icon="pi pi-trash"
+          [rounded]="true"
+          [text]="true"
+          severity="danger"
+          (click)="confirmDelete(user)"
+          pTooltip="Delete user"
+        />
+      </td>
+    </tr>
+  </ng-template>
+  <ng-template pTemplate="emptymessage">
+    <tr>
+      <td colspan="6" class="text-center p-4 text-color-secondary">No users found.</td>
+    </tr>
+  </ng-template>
+</p-table>
+
+<!-- Create User Dialog -->
+<p-dialog
+  header="New User"
+  [(visible)]="showCreateDialog"
+  [modal]="true"
+  [style]="{ width: '480px' }"
+  [draggable]="false"
+>
+  <div class="grid">
+    <div class="col-12">
+      <label class="block mb-2 font-medium">
+        Email <span class="text-red-500">*</span>
+      </label>
+      <input
+        pInputText
+        type="email"
+        [(ngModel)]="form.email"
+        class="w-full"
+        placeholder="user@example.com"
+      />
+    </div>
+    <div class="col-12">
+      <label class="block mb-2 font-medium">
+        Password <span class="text-red-500">*</span>
+      </label>
+      <p-password
+        [(ngModel)]="form.password"
+        [feedback]="true"
+        styleClass="w-full"
+        inputStyleClass="w-full"
+        placeholder="Minimum 8 characters"
+        [toggleMask]="true"
+      />
+    </div>
+    <div class="col-6">
+      <label class="block mb-2 font-medium">First Name</label>
+      <input
+        pInputText
+        [(ngModel)]="form.firstName"
+        class="w-full"
+        placeholder="First name"
+      />
+    </div>
+    <div class="col-6">
+      <label class="block mb-2 font-medium">Last Name</label>
+      <input
+        pInputText
+        [(ngModel)]="form.lastName"
+        class="w-full"
+        placeholder="Last name"
+      />
+    </div>
+    <div class="col-12">
+      <label class="block mb-2 font-medium">
+        User Type <span class="text-red-500">*</span>
+      </label>
+      <p-select
+        [options]="userTypeOptions"
+        [(ngModel)]="form.userType"
+        optionLabel="label"
+        optionValue="value"
+        styleClass="w-full"
+      />
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button
+      label="Cancel"
+      severity="secondary"
+      (click)="showCreateDialog = false"
+    />
+    <p-button
+      label="Create"
+      icon="pi pi-check"
+      (click)="createUser()"
+      [loading]="saving()"
+      [disabled]="!form.email.trim() || !form.password.trim()"
+    />
+  </ng-template>
+</p-dialog>

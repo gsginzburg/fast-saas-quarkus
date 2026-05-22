@@ -51,6 +51,9 @@ public class Cluster extends PanacheEntityBase {
     @Column(nullable = false)
     public String url;
 
+    @Column(name = "api_url")
+    public String apiUrl;
+
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     @Builder.Default

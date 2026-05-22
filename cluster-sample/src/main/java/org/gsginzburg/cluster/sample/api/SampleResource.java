@@ -39,7 +39,7 @@ import java.util.UUID;
 @Path("/api/app/test-records")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@RolesAllowed({"USER", "ADMIN"})
+@RolesAllowed({"USER", "ADMIN", "BACKOFFICE", "READONLY"})
 public class SampleResource {
 
     @Inject TestRecordService testRecordService;

@@ -16,7 +16,7 @@
 
 package org.gsginzburg.cluster.framework.api;
 
-import jakarta.annotation.security.RolesAllowed;
+import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -29,6 +29,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.gsginzburg.cluster.framework.config.ClusterConfig;
 import org.gsginzburg.cluster.framework.datasource.TenantShardCache;
 import org.gsginzburg.cluster.framework.management.TenantMigrationService;
 import org.gsginzburg.cluster.framework.management.TenantUpgradeResult;
@@ -41,17 +42,19 @@ import java.util.Map;
 @Path("/api/management/tenants")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@RolesAllowed("BACKOFFICE")
+@PermitAll
 public class TenantManagementResource {
 
     @Inject TenantMigrationService migrationService;
     @Inject TenantUpgradeService upgradeService;
     @Inject TenantShardCache tenantShardCache;
+    @Inject ClusterConfig clusterConfig;
 
     @POST
     public Response createTenant(Map<String, String> body) throws Exception {
         String tenantId = body.get("tenantId");
-        String shardId = body.get("shardId");
+        String shardId = body.getOrDefault("shardId",
+                clusterConfig.shards().keySet().iterator().next());
         migrationService.createTenant(tenantId, shardId);
         return Response.status(201).entity(ApiResponse.ok()).build();
     }

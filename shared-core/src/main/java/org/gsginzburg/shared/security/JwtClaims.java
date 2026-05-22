@@ -22,16 +22,11 @@ import lombok.Builder;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * Canonical representation of the claims carried in every platform JWT.
- * Fields not present in a given token type will be null.
- */
 @Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record JwtClaims(
         String sub,
         String iss,
-        TokenType type,
         String tenantId,
         String clusterUrl,
         String clusterId,

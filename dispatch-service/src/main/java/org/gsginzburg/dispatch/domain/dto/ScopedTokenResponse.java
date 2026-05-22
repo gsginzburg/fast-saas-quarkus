@@ -14,20 +14,6 @@
  * limitations under the License.
  */
 
-package org.gsginzburg.shared.client;
+package org.gsginzburg.dispatch.domain.dto;
 
-import org.gsginzburg.shared.dto.ClusterInfo;
-import org.gsginzburg.shared.dto.ClusterTenantInfo;
-import org.gsginzburg.shared.dto.ClusterUserInfo;
-
-/**
- * Contract for cluster-to-dispatch communication.
- */
-public interface DispatchClient {
-
-    ClusterTenantInfo getTenantInfo(String tenantId);
-
-    ClusterUserInfo getUserInfo(String userId);
-
-    ClusterInfo getClusterInfo(String clusterId);
-}
+public record ScopedTokenResponse(String scopedToken, long expiresIn) {}

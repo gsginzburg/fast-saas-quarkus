@@ -19,19 +19,24 @@ package org.gsginzburg.cluster.framework.tenant;
 import io.quarkus.hibernate.orm.PersistenceUnitExtension;
 import io.quarkus.hibernate.orm.runtime.tenant.TenantResolver;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.gsginzburg.cluster.framework.datasource.TenantContext;
 import org.gsginzburg.cluster.framework.datasource.TenantContextHolder;
+
 
 /**
  * Quarkus schema-based multi-tenancy resolver.
  *
- * Returns the tenant UUID as the schema name so Hibernate sets
- * {@code search_path = "<tenantId>"} on every connection acquired
- * for a tenant request.
+ * Reads the tenant UUID from the injected {@link TenantContextHolder} and returns it
+ * as the schema name so Hibernate sets {@code search_path = "<tenantId>"} on every
+ * connection acquired for a tenant request.
  */
 @ApplicationScoped
 @PersistenceUnitExtension
 public class ClusterTenantResolver implements TenantResolver {
+
+    @Inject
+    TenantContextHolder tenantContextHolder;
 
     @Override
     public String getDefaultTenantId() {
@@ -40,10 +45,10 @@ public class ClusterTenantResolver implements TenantResolver {
 
     @Override
     public String resolveTenantId() {
-        TenantContext ctx = TenantContextHolder.get();
-        if (ctx == null || ctx.tenantId() == null || ctx.tenantId().isBlank()) {
-            return getDefaultTenantId();
+        TenantContext ctx = tenantContextHolder.get();
+        if (ctx != null && ctx.tenantId() != null && !ctx.tenantId().isBlank()) {
+            return ctx.tenantId();
         }
-        return ctx.tenantId();
+        throw new IllegalStateException("No tenant context found");
     }
 }

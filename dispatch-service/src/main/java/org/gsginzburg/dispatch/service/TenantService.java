@@ -42,10 +42,10 @@ public class TenantService {
     @Inject ClusterRepository clusterRepository;
     @Inject TenantUserRepository tenantUserRepository;
 
+    @Transactional
     public PageDto<Tenant> getTenants(int page, int size) {
-        var query = tenantRepository.queryAll();
-        long total = query.count();
-        List<Tenant> content = query.page(page, size).list();
+        long total = tenantRepository.countAll();
+        List<Tenant> content = tenantRepository.findPageWithCluster(page, size);
         return PageDto.<Tenant>builder()
                 .content(content)
                 .totalElements(total)
@@ -116,7 +116,7 @@ public class TenantService {
     }
 
     private Tenant findTenant(UUID id) {
-        return tenantRepository.findByIdOptional(id)
+        return tenantRepository.findByIdWithCluster(id)
                 .orElseThrow(() -> new TenantNotFoundException(id.toString()));
     }
 }

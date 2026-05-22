@@ -55,10 +55,11 @@ public class ClusterService {
     }
 
     @Transactional
-    public Cluster createCluster(String name, String url) {
+    public Cluster createCluster(String name, String url, String apiUrl) {
         Cluster cluster = Cluster.builder()
                 .name(name)
                 .url(url)
+                .apiUrl(apiUrl)
                 .status(ClusterStatus.ACTIVE)
                 .build();
         clusterRepository.persist(cluster);
@@ -66,11 +67,12 @@ public class ClusterService {
     }
 
     @Transactional
-    public Cluster updateCluster(UUID id, String name, String url) {
+    public Cluster updateCluster(UUID id, String name, String url, String apiUrl) {
         Cluster cluster = clusterRepository.findByIdOptional(id)
                 .orElseThrow(() -> new RuntimeException("Cluster not found: " + id));
         cluster.setName(name);
         cluster.setUrl(url);
+        cluster.setApiUrl(apiUrl);
         return cluster;
     }
 

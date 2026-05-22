@@ -28,14 +28,14 @@ public interface ClusterConfig {
     String id();
     String name();
     String dispatchUrl();
-    Jwt jwt();
+    String dispatchInternalApiKey();
+    Management management();
     Map<String, ShardConfig> shards();
     PathTenantInjection pathTenantInjection();
 
-    interface Jwt {
-        String secret();
-        @WithDefault("cluster") String issuer();
-        @WithDefault("28800") long sessionTokenExpirySeconds();
+    interface Management {
+        @WithDefault("change-me-in-production")
+        String apiKey();
     }
 
     interface ShardConfig {
@@ -47,16 +47,11 @@ public interface ClusterConfig {
     }
 
     interface PathTenantInjection {
-        /** Whether path-based tenant injection is enabled. */
         @WithDefault("false")
         boolean enabled();
 
-        /**
-         * JWT token types whose bearers are allowed to specify a tenant via the URL path.
-         * Values must match {@link org.gsginzburg.shared.security.TokenType} names
-         * (e.g., BACKOFFICE, SERVICE_ACCOUNT).
-         */
-        Optional<List<String>> allowedTokenTypes();
+        /** Roles whose bearers are allowed to specify a tenant via the URL path (e.g., BACKOFFICE). */
+        Optional<List<String>> allowedRoles();
     }
 
     interface SchemaUpgrade {

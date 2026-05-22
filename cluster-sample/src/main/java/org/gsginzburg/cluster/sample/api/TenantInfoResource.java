@@ -23,43 +23,59 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import org.gsginzburg.cluster.framework.datasource.TenantContext;
 import org.gsginzburg.cluster.framework.datasource.TenantContextHolder;
-import org.gsginzburg.cluster.sample.client.DispatchClientImpl;
+import org.gsginzburg.cluster.framework.security.ValidatedToken;
 import org.gsginzburg.shared.dto.ApiResponse;
-import org.gsginzburg.shared.dto.ClusterInfo;
-import org.gsginzburg.shared.dto.ClusterTenantInfo;
-import org.gsginzburg.shared.dto.ClusterUserInfo;
-import org.gsginzburg.shared.security.JwtClaims;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @Path("/api/app/context")
 @Produces(MediaType.APPLICATION_JSON)
-@RolesAllowed({"USER", "ADMIN"})
+@RolesAllowed({"USER", "ADMIN", "BACKOFFICE", "READONLY"})
 public class TenantInfoResource {
 
-    @Inject DispatchClientImpl dispatchClient;
     @Inject SecurityIdentity securityIdentity;
+    @Inject TenantContextHolder tenantContextHolder;
 
     @GET
-    public ApiResponse<Map<String, Object>> getContext() {
-        JwtClaims claims = securityIdentity.getAttribute("claims");
-        TenantContext ctx = TenantContextHolder.get();
+    public Response getContext() {
+        ValidatedToken vt = securityIdentity.getAttribute("validatedToken");
+        if (vt == null) {
+            return Response.status(500)
+                    .entity(ApiResponse.error("Validated token not available")).build();
+        }
 
-        ClusterTenantInfo tenantInfo = dispatchClient.getTenantInfo(claims.tenantId());
-        ClusterUserInfo userInfo = dispatchClient.getUserInfo(claims.sub());
-        ClusterInfo clusterInfo = dispatchClient.getClusterInfo(claims.clusterId());
+        TenantContext ctx = tenantContextHolder.get();
+        Map<String, Object> context = new HashMap<>();
+        context.put("user", Map.of(
+                "id",        vt.userId() != null ? vt.userId() : "",
+                "email",     vt.email() != null ? vt.email() : "",
+                "firstName", vt.firstName() != null ? vt.firstName() : "",
+                "lastName",  vt.lastName() != null ? vt.lastName() : "",
+                "userType",  vt.userType() != null ? vt.userType() : "",
+                "roles",     vt.roles() != null ? vt.roles() : java.util.List.of()
+        ));
+        if (vt.tenantId() != null) {
+            context.put("tenant", Map.of(
+                    "id",     vt.tenantId(),
+                    "name",   vt.tenantName() != null ? vt.tenantName() : "",
+                    "status", vt.tenantStatus() != null ? vt.tenantStatus() : ""
+            ));
+        }
+        if (vt.clusterName() != null) {
+            context.put("cluster", Map.of(
+                    "name", vt.clusterName(),
+                    "url",  vt.clusterUrl() != null ? vt.clusterUrl() : ""
+            ));
+        }
+        context.put("localContext", Map.of(
+                "userId",     ctx != null && ctx.userId() != null ? ctx.userId() : "unknown",
+                "schemaName", ctx != null && ctx.tenantId() != null ? ctx.tenantId() : "unknown"
+        ));
 
-        Map<String, Object> context = Map.of(
-                "tenant", tenantInfo,
-                "user", userInfo,
-                "cluster", clusterInfo,
-                "localContext", Map.of(
-                        "userId", ctx != null ? ctx.userId() : "unknown",
-                        "schemaName", ctx != null ? ctx.tenantId() : "unknown"
-                )
-        );
-        return ApiResponse.ok(context);
+        return Response.ok(ApiResponse.ok(context)).build();
     }
 }

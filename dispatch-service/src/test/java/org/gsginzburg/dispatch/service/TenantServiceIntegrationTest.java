@@ -62,7 +62,7 @@ public class TenantServiceIntegrationTest extends AbstractIntegrationTest {
     @BeforeEach
     void setupCluster() {
         Cluster cluster = clusterService.createCluster(
-                "Test Cluster " + UUID.randomUUID(), "https://test.cluster.internal");
+                "Test Cluster " + UUID.randomUUID(), "https://test.cluster.internal", "");
         clusterId = cluster.getId();
     }
 
@@ -131,7 +131,7 @@ public class TenantServiceIntegrationTest extends AbstractIntegrationTest {
     void assignCluster_updatesClusterIdInDb() {
         Tenant created = createTenant("Mobile Corp");
         Cluster clusterB = clusterService.createCluster(
-                "Cluster B " + UUID.randomUUID(), "https://b.cluster.internal");
+                "Cluster B " + UUID.randomUUID(), "https://b.cluster.internal", "");
 
         tenantService.assignCluster(created.getId(), clusterB.getId());
 

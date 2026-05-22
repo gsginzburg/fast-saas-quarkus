@@ -16,8 +16,6 @@
 
 package org.gsginzburg.cluster.sample.persistence;
 
-import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.context.control.RequestContextController;
 import jakarta.inject.Inject;
@@ -26,6 +24,7 @@ import org.gsginzburg.cluster.framework.datasource.TenantContext;
 import org.gsginzburg.cluster.framework.datasource.TenantContextHolder;
 import org.gsginzburg.cluster.framework.datasource.TenantShardCache;
 import org.gsginzburg.cluster.framework.management.TenantMigrationService;
+import org.gsginzburg.cluster.sample.AbstractClusterSampleIntegrationTest;
 import org.gsginzburg.cluster.sample.domain.model.TestRecord;
 import org.gsginzburg.cluster.sample.domain.repository.TestRecordRepository;
 import org.gsginzburg.cluster.sample.service.TestRecordService;
@@ -38,56 +37,20 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @QuarkusTest
-@QuarkusTestResource(TestRecordPersistenceIntegrationTest.DbProvisioner.class)
-class TestRecordPersistenceIntegrationTest {
+class TestRecordPersistenceIntegrationTest extends AbstractClusterSampleIntegrationTest {
 
     private static final String JDBC_URL = "jdbc:postgresql://localhost:5432/cluster-sample-test";
     private static final String DB_USER  = "cluster-sample-test";
     private static final String DB_PASS  = "cluster-sample-test";
 
-    public static class DbProvisioner implements QuarkusTestResourceLifecycleManager {
-
-        @Override
-        public Map<String, String> start() {
-            runPsql("postgres", "DROP DATABASE IF EXISTS \"cluster-sample-test\" WITH (FORCE)");
-            runPsql("postgres", "DROP USER IF EXISTS \"cluster-sample-test\"");
-            runPsql("postgres", "CREATE USER \"cluster-sample-test\" WITH PASSWORD 'cluster-sample-test'");
-            runPsql("postgres", "CREATE DATABASE \"cluster-sample-test\" OWNER \"cluster-sample-test\"");
-            runPsql("postgres", "GRANT ALL PRIVILEGES ON DATABASE \"cluster-sample-test\" TO \"cluster-sample-test\"");
-            return Map.of();
-        }
-
-        @Override
-        public void stop() {
-            runPsql("postgres", "DROP DATABASE IF EXISTS \"cluster-sample-test\" WITH (FORCE)");
-            runPsql("postgres", "DROP USER IF EXISTS \"cluster-sample-test\"");
-        }
-
-        private static void runPsql(String database, String sql) {
-            try {
-                ProcessBuilder pb = new ProcessBuilder(
-                        "sudo", "-n", "-u", "postgres", "psql", "-d", database, "-c", sql);
-                pb.redirectErrorStream(true);
-                Process p = pb.start();
-                String output = new String(p.getInputStream().readAllBytes());
-                int exit = p.waitFor();
-                if (exit != 0) {
-                    System.err.println("[DbProvisioner] psql exit=" + exit + ": " + output.trim());
-                }
-            } catch (Exception e) {
-                System.err.println("[DbProvisioner] Failed: " + e.getMessage());
-            }
-        }
-    }
-
     @Inject TenantMigrationService   tenantMigrationService;
     @Inject TenantShardCache         tenantShardCache;
+    @Inject TenantContextHolder      tenantContextHolder;
     @Inject TestRecordRepository     testRecordRepository;
     @Inject TestRecordService        testRecordService;
     @Inject RequestContextController requestContextController;
@@ -99,12 +62,13 @@ class TestRecordPersistenceIntegrationTest {
         requestContextController.activate();
         tenantId = UUID.randomUUID().toString();
         tenantMigrationService.createTenant(tenantId, "shard-1");
-        TenantContextHolder.set(TenantContext.builder().tenantId(tenantId).build());
+        TenantContext ctx = TenantContext.builder().tenantId(tenantId).build();
+        tenantContextHolder.set(ctx);
     }
 
     @AfterEach
     void dropTenantSchemaAndClearContext() {
-        TenantContextHolder.clear();
+        tenantContextHolder.clear();
         dropSchemaIfExists(tenantId);
         dropSchemaIfExists("archived-" + tenantId);
         tenantShardCache.removeTenant(tenantId);

@@ -18,6 +18,7 @@ package org.gsginzburg.dispatch.api;
 
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.DefaultValue;
@@ -28,14 +29,16 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
-import jakarta.validation.Valid;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import lombok.extern.slf4j.Slf4j;
 import org.gsginzburg.dispatch.converter.TenantConverter;
 import org.gsginzburg.dispatch.converter.TenantMembershipConverter;
 import org.gsginzburg.dispatch.domain.dto.TenantDto;
 import org.gsginzburg.dispatch.domain.dto.TenantMembershipDto;
+import org.gsginzburg.dispatch.domain.model.Tenant;
 import org.gsginzburg.dispatch.domain.model.TenantStatus;
+import org.gsginzburg.dispatch.service.ClusterManagementClient;
 import org.gsginzburg.dispatch.service.TenantService;
 import org.gsginzburg.shared.dto.ApiResponse;
 import org.gsginzburg.shared.dto.PageDto;
@@ -44,6 +47,7 @@ import org.gsginzburg.shared.security.UserRole;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Path("/api/backoffice/tenants")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -53,6 +57,7 @@ public class TenantResource {
     @Inject TenantService tenantService;
     @Inject TenantConverter tenantConverter;
     @Inject TenantMembershipConverter membershipConverter;
+    @Inject ClusterManagementClient clusterManagementClient;
 
     @GET
     public ApiResponse<PageDto<TenantDto>> getTenants(
@@ -69,10 +74,42 @@ public class TenantResource {
 
     @POST
     public Response createTenant(@Valid TenantDto request) {
+        Tenant tenant = tenantService.createTenant(request.name(), UUID.fromString(request.clusterId()));
+        String apiUrl = tenant.getCluster().getApiUrl();
+        if (apiUrl != null && !apiUrl.isBlank()) {
+            try {
+                clusterManagementClient.provisionTenant(apiUrl, tenant.getId().toString());
+            } catch (Exception e) {
+                log.warn("Cluster provisioning failed for tenant {}: {}", tenant.getId(), e.getMessage());
+            }
+        }
         return Response.status(201)
-                .entity(ApiResponse.ok(tenantConverter.toDto(
-                        tenantService.createTenant(request.name(), UUID.fromString(request.clusterId())))))
+                .entity(ApiResponse.ok(tenantConverter.toDto(tenant)))
                 .build();
+    }
+
+    @POST
+    @Path("/{id}/provision")
+    public ApiResponse<Void> provisionTenant(@PathParam("id") UUID id) {
+        Tenant tenant = tenantService.getTenant(id);
+        String apiUrl = tenant.getCluster().getApiUrl();
+        if (apiUrl == null || apiUrl.isBlank()) {
+            throw new RuntimeException("Cluster has no API URL configured");
+        }
+        clusterManagementClient.provisionTenant(apiUrl, id.toString());
+        return ApiResponse.ok();
+    }
+
+    @POST
+    @Path("/{id}/upgrade")
+    public ApiResponse<Void> upgradeTenant(@PathParam("id") UUID id) {
+        Tenant tenant = tenantService.getTenant(id);
+        String apiUrl = tenant.getCluster().getApiUrl();
+        if (apiUrl == null || apiUrl.isBlank()) {
+            throw new RuntimeException("Cluster has no API URL configured");
+        }
+        clusterManagementClient.upgradeTenant(apiUrl, id.toString());
+        return ApiResponse.ok();
     }
 
     @PUT
@@ -118,4 +155,5 @@ public class TenantResource {
         tenantService.removeUser(id, userId);
         return ApiResponse.ok();
     }
+
 }

@@ -16,65 +16,34 @@
 
 package org.gsginzburg.cluster.framework.datasource;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
+import jakarta.enterprise.context.ApplicationScoped;
 
 /**
- * Stack-based ThreadLocal holder for {@link TenantContext}.
- *
- * A stack allows nested {@code withTenant} calls: inner scopes push a new context and
- * pop it on exit, leaving the outer context intact. The per-request JWT mechanism sets
- * a single context via {@link #set} and clears it via {@link #clear}.
+ * CDI-injectable ThreadLocal holder for the current request's {@link TenantContext}.
+ * Holds exactly one context per thread. Inject this bean wherever tenant context is needed.
  */
-public final class TenantContextHolder {
+@ApplicationScoped
+public class TenantContextHolder {
 
-    private static final ThreadLocal<Deque<TenantContext>> STACK =
-            ThreadLocal.withInitial(ArrayDeque::new);
+    private final ThreadLocal<TenantContext> CTX = new ThreadLocal<>();
 
-    private TenantContextHolder() {}
-
-    public static void push(TenantContext ctx) {
-        STACK.get().push(ctx);
+    public TenantContext get() {
+        return CTX.get();
     }
 
-    public static TenantContext peek() {
-        return STACK.get().peek();
-    }
-
-    public static TenantContext pop() {
-        Deque<TenantContext> stack = STACK.get();
-        if (stack.isEmpty()) {
-            throw new IllegalStateException("Tenant context stack is empty");
+    public void set(TenantContext ctx) {
+        if (ctx == null) {
+            CTX.remove();
+        } else {
+            CTX.set(ctx);
         }
-        return stack.pop();
     }
 
-    public static TenantContext get() {
-        return peek();
+    public void clear() {
+        CTX.remove();
     }
 
-    public static void clear() {
-        STACK.remove();
-    }
-
-    public static boolean hasContext() {
-        Deque<TenantContext> stack = STACK.get();
-        return stack != null && !stack.isEmpty();
-    }
-
-    public static int depth() {
-        Deque<TenantContext> stack = STACK.get();
-        return stack == null ? 0 : stack.size();
-    }
-
-    /**
-     * Compatibility method used by the JWT auth mechanism to establish a single
-     * request-level context. Clears any previous stack state then pushes the given context.
-     */
-    public static void set(TenantContext ctx) {
-        STACK.remove();
-        if (ctx != null) {
-            STACK.get().push(ctx);
-        }
+    public boolean hasContext() {
+        return CTX.get() != null;
     }
 }

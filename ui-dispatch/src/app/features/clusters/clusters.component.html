@@ -1,0 +1,186 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex justify-content-between align-items-center mb-4">
+  <h2 class="m-0">Clusters</h2>
+  <p-button label="New Cluster" icon="pi pi-plus" (click)="openCreateDialog()" />
+</div>
+
+<p-table
+  [value]="clusters()"
+  [loading]="loading()"
+  [paginator]="true"
+  [rows]="pageSize"
+  [totalRecords]="totalRecords()"
+  [lazy]="true"
+  (onLazyLoad)="onLazyLoad($event)"
+  responsiveLayout="scroll"
+  styleClass="p-datatable-gridlines"
+>
+  <ng-template pTemplate="header">
+    <tr>
+      <th>Name</th>
+      <th>URL</th>
+      <th>API URL</th>
+      <th>Status</th>
+      <th>Created</th>
+      <th style="width: 12rem">Actions</th>
+    </tr>
+  </ng-template>
+  <ng-template pTemplate="body" let-cluster>
+    <tr>
+      <td class="font-medium">{{ cluster.name }}</td>
+      <td>
+        <a [href]="cluster.url" target="_blank" class="text-primary no-underline hover:underline">
+          {{ cluster.url }}
+        </a>
+      </td>
+      <td class="text-sm text-color-secondary font-mono">{{ cluster.apiUrl || '—' }}</td>
+      <td>
+        <p-tag
+          [value]="cluster.status"
+          [severity]="cluster.status === 'ACTIVE' ? 'success' : 'warn'"
+        />
+      </td>
+      <td>{{ cluster.createdAt | date: 'short' }}</td>
+      <td>
+        <p-button
+          icon="pi pi-sync"
+          [rounded]="true"
+          [text]="true"
+          severity="warn"
+          (click)="upgradeAll(cluster)"
+          [loading]="upgradingClusterId() === cluster.id"
+          pTooltip="Upgrade all tenant schemas"
+        />
+        <p-button
+          icon="pi pi-pencil"
+          [rounded]="true"
+          [text]="true"
+          severity="info"
+          (click)="openEditDialog(cluster)"
+          pTooltip="Edit cluster"
+        />
+        <p-button
+          icon="pi pi-trash"
+          [rounded]="true"
+          [text]="true"
+          severity="danger"
+          (click)="confirmDelete(cluster)"
+          pTooltip="Delete cluster"
+        />
+      </td>
+    </tr>
+  </ng-template>
+  <ng-template pTemplate="emptymessage">
+    <tr>
+      <td colspan="5" class="text-center p-4 text-color-secondary">No clusters found.</td>
+    </tr>
+  </ng-template>
+</p-table>
+
+<!-- Create Dialog -->
+<p-dialog
+  header="New Cluster"
+  [(visible)]="showCreateDialog"
+  [modal]="true"
+  [style]="{ width: '450px' }"
+  [draggable]="false"
+>
+  <div class="field mb-3">
+    <label class="block mb-2 font-medium">Name <span class="text-red-500">*</span></label>
+    <input
+      pInputText
+      [(ngModel)]="form.name"
+      class="w-full"
+      placeholder="e.g. us-east-1"
+    />
+  </div>
+  <div class="field mb-3">
+    <label class="block mb-2 font-medium">URL <span class="text-red-500">*</span></label>
+    <input
+      pInputText
+      [(ngModel)]="form.url"
+      class="w-full"
+      placeholder="https://cluster.example.com"
+      type="url"
+    />
+  </div>
+  <div class="field mb-3">
+    <label class="block mb-2 font-medium">API URL</label>
+    <input
+      pInputText
+      [(ngModel)]="form.apiUrl"
+      class="w-full"
+      placeholder="http://cluster-api.example.com:8081"
+      type="url"
+    />
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button
+      label="Cancel"
+      severity="secondary"
+      (click)="showCreateDialog = false"
+    />
+    <p-button
+      label="Create"
+      icon="pi pi-check"
+      (click)="createCluster()"
+      [loading]="saving()"
+      [disabled]="!form.name.trim() || !form.url.trim()"
+    />
+  </ng-template>
+</p-dialog>
+
+<!-- Edit Dialog -->
+<p-dialog
+  header="Edit Cluster: {{ editingCluster?.name }}"
+  [(visible)]="showEditDialog"
+  [modal]="true"
+  [style]="{ width: '450px' }"
+  [draggable]="false"
+>
+  <div class="field mb-3">
+    <label class="block mb-2 font-medium">Name <span class="text-red-500">*</span></label>
+    <input
+      pInputText
+      [(ngModel)]="editForm.name"
+      class="w-full"
+      placeholder="Cluster name"
+    />
+  </div>
+  <div class="field mb-3">
+    <label class="block mb-2 font-medium">URL <span class="text-red-500">*</span></label>
+    <input
+      pInputText
+      [(ngModel)]="editForm.url"
+      class="w-full"
+      placeholder="https://cluster.example.com"
+      type="url"
+    />
+  </div>
+  <div class="field mb-3">
+    <label class="block mb-2 font-medium">API URL</label>
+    <input
+      pInputText
+      [(ngModel)]="editForm.apiUrl"
+      class="w-full"
+      placeholder="http://cluster-api.example.com:8081"
+      type="url"
+    />
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button
+      label="Cancel"
+      severity="secondary"
+      (click)="showEditDialog = false"
+    />
+    <p-button
+      label="Save"
+      icon="pi pi-check"
+      (click)="updateCluster()"
+      [loading]="saving()"
+      [disabled]="!editForm.name.trim() || !editForm.url.trim()"
+    />
+  </ng-template>
+</p-dialog>

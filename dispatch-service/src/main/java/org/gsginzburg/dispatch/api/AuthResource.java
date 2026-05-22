@@ -16,6 +16,7 @@
 
 package org.gsginzburg.dispatch.api;
 
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
@@ -31,6 +32,8 @@ import org.gsginzburg.dispatch.auth.jwt.DispatchJwtService;
 import org.gsginzburg.dispatch.domain.dto.LoginRequest;
 import org.gsginzburg.dispatch.domain.dto.LoginResponse;
 import org.gsginzburg.dispatch.domain.dto.RefreshTokenRequest;
+import org.gsginzburg.dispatch.domain.dto.ScopeToTenantRequest;
+import org.gsginzburg.dispatch.domain.dto.ScopedTokenResponse;
 import org.gsginzburg.dispatch.service.AuthService;
 import org.gsginzburg.shared.dto.ApiResponse;
 import org.gsginzburg.shared.security.JwtClaims;
@@ -61,10 +64,19 @@ public class AuthResource {
     @POST
     @Path("/logout")
     @Authenticated
+    @Consumes(MediaType.WILDCARD)
     public Response logout() {
         JwtClaims claims = identity.getAttribute("claims");
         authService.logout(UUID.fromString(claims.sub()));
         return Response.ok(ApiResponse.ok()).build();
+    }
+
+    @POST
+    @Path("/scope-to-tenant")
+    @RolesAllowed("BACKOFFICE")
+    public ApiResponse<ScopedTokenResponse> scopeToTenant(@Valid ScopeToTenantRequest request) {
+        JwtClaims claims = identity.getAttribute("claims");
+        return ApiResponse.ok(authService.scopeToTenant(claims.sub(), request.tenantId()));
     }
 
     @GET

@@ -17,8 +17,9 @@
 package org.gsginzburg.dispatch.domain.repository;
 
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
-import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import org.gsginzburg.dispatch.domain.model.Tenant;
 
 import java.util.List;
@@ -28,15 +29,41 @@ import java.util.UUID;
 @ApplicationScoped
 public class TenantRepository implements PanacheRepositoryBase<Tenant, UUID> {
 
+    @Inject EntityManager em;
+
     public Optional<Tenant> findByName(String name) {
-        return find("name", name).firstResultOptional();
+        return em.createQuery(
+                "SELECT t FROM Tenant t WHERE t.name = :name", Tenant.class)
+                .setParameter("name", name)
+                .getResultStream()
+                .findFirst();
     }
 
     public List<Tenant> findByClusterId(UUID clusterId) {
-        return list("cluster.id = ?1", clusterId);
+        return em.createQuery(
+                "SELECT t FROM Tenant t WHERE t.cluster.id = :clusterId", Tenant.class)
+                .setParameter("clusterId", clusterId)
+                .getResultList();
     }
 
-    public io.quarkus.hibernate.orm.panache.PanacheQuery<Tenant> queryAll() {
-        return findAll(Sort.by("name"));
+    public Optional<Tenant> findByIdWithCluster(UUID id) {
+        return em.createQuery(
+                "SELECT t FROM Tenant t JOIN FETCH t.cluster WHERE t.id = :id", Tenant.class)
+                .setParameter("id", id)
+                .getResultStream()
+                .findFirst();
+    }
+
+    public long countAll() {
+        return em.createQuery("SELECT COUNT(t) FROM Tenant t", Long.class)
+                .getSingleResult();
+    }
+
+    public List<Tenant> findPageWithCluster(int page, int size) {
+        return em.createQuery(
+                "SELECT t FROM Tenant t JOIN FETCH t.cluster ORDER BY t.name", Tenant.class)
+                .setFirstResult(page * size)
+                .setMaxResults(size)
+                .getResultList();
     }
 }

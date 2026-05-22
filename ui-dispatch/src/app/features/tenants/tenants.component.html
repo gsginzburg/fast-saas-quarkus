@@ -1,0 +1,292 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex justify-content-between align-items-center mb-4">
+  <h2 class="m-0">Tenants</h2>
+  <p-button label="New Tenant" icon="pi pi-plus" (click)="openCreateDialog()" />
+</div>
+
+<p-table
+  [value]="tenants()"
+  [loading]="loading()"
+  [paginator]="true"
+  [rows]="pageSize"
+  [totalRecords]="totalRecords()"
+  [lazy]="true"
+  (onLazyLoad)="onLazyLoad($event)"
+  responsiveLayout="scroll"
+  styleClass="p-datatable-gridlines"
+>
+  <ng-template pTemplate="header">
+    <tr>
+      <th>Name</th>
+      <th>Status</th>
+      <th>Cluster</th>
+      <th>Deep Link</th>
+      <th>Created</th>
+      <th style="width: 13rem">Actions</th>
+    </tr>
+  </ng-template>
+  <ng-template pTemplate="body" let-tenant>
+    <tr>
+      <td class="font-medium">{{ tenant.name }}</td>
+      <td>
+        <p-tag
+          [value]="tenant.status"
+          [severity]="statusSeverity(tenant.status)"
+        />
+      </td>
+      <td>{{ tenant.clusterName || '—' }}</td>
+      <td>
+        @if (tenant.deepLinkUrl) {
+          <a
+            [href]="tenant.deepLinkUrl"
+            target="_blank"
+            class="text-primary no-underline hover:underline text-sm font-mono"
+            pTooltip="Open anonymous deep link"
+          >{{ tenant.deepLinkUrl }}</a>
+        } @else {
+          <span class="text-color-secondary">—</span>
+        }
+      </td>
+      <td>{{ tenant.createdAt | date: 'short' }}</td>
+      <td>
+        <p-button
+          icon="pi pi-download"
+          [rounded]="true"
+          [text]="true"
+          severity="secondary"
+          (click)="provisionTenant(tenant)"
+          [loading]="provisioningTenantId() === tenant.id"
+          pTooltip="Provision schema"
+        />
+        <p-button
+          icon="pi pi-sync"
+          [rounded]="true"
+          [text]="true"
+          severity="warn"
+          (click)="upgradeTenant(tenant)"
+          [loading]="upgradingTenantId() === tenant.id"
+          pTooltip="Upgrade schema"
+        />
+        <p-button
+          icon="pi pi-external-link"
+          [rounded]="true"
+          [text]="true"
+          severity="success"
+          (click)="openTenant(tenant)"
+          [loading]="openingTenantId() === tenant.id"
+          pTooltip="View tenant app"
+        />
+        <p-button
+          icon="pi pi-pencil"
+          [rounded]="true"
+          [text]="true"
+          severity="info"
+          (click)="openEditDialog(tenant)"
+          pTooltip="Edit status"
+        />
+        <p-button
+          icon="pi pi-sitemap"
+          [rounded]="true"
+          [text]="true"
+          severity="secondary"
+          (click)="openUsersDialog(tenant)"
+          pTooltip="Manage users"
+        />
+        <p-button
+          icon="pi pi-trash"
+          [rounded]="true"
+          [text]="true"
+          severity="danger"
+          (click)="confirmDelete(tenant)"
+          pTooltip="Delete"
+        />
+      </td>
+    </tr>
+  </ng-template>
+  <ng-template pTemplate="emptymessage">
+    <tr>
+      <td colspan="5" class="text-center p-4 text-color-secondary">No tenants found.</td>
+    </tr>
+  </ng-template>
+</p-table>
+
+<!-- Create Dialog -->
+<p-dialog
+  header="New Tenant"
+  [(visible)]="showCreateDialog"
+  [modal]="true"
+  [style]="{ width: '450px' }"
+  [draggable]="false"
+>
+  <div class="field mb-3">
+    <label class="block mb-2 font-medium">Name <span class="text-red-500">*</span></label>
+    <input
+      pInputText
+      [(ngModel)]="newTenantName"
+      class="w-full"
+      placeholder="Enter tenant name"
+    />
+  </div>
+  <div class="field mb-3">
+    <label class="block mb-2 font-medium">Cluster <span class="text-red-500">*</span></label>
+    <p-select
+      [options]="clusters()"
+      [(ngModel)]="selectedClusterId"
+      optionLabel="name"
+      optionValue="id"
+      placeholder="Select a cluster"
+      styleClass="w-full"
+      [filter]="true"
+      filterPlaceholder="Search clusters..."
+    />
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button
+      label="Cancel"
+      severity="secondary"
+      (click)="showCreateDialog = false"
+    />
+    <p-button
+      label="Create"
+      icon="pi pi-check"
+      (click)="createTenant()"
+      [loading]="saving()"
+      [disabled]="!newTenantName.trim() || !selectedClusterId"
+    />
+  </ng-template>
+</p-dialog>
+
+<!-- Edit Status / Assign Cluster Dialog -->
+<p-dialog
+  header="Edit Tenant: {{ editingTenant?.name }}"
+  [(visible)]="showEditDialog"
+  [modal]="true"
+  [style]="{ width: '420px' }"
+  [draggable]="false"
+>
+  <div class="field mb-3">
+    <label class="block mb-2 font-medium">Status</label>
+    <p-select
+      [options]="statusOptions"
+      [(ngModel)]="editStatus"
+      optionLabel="label"
+      optionValue="value"
+      styleClass="w-full"
+    />
+  </div>
+  <div class="field mb-3">
+    <label class="block mb-2 font-medium">Assign Cluster</label>
+    <p-select
+      [options]="clusters()"
+      [(ngModel)]="editClusterId"
+      optionLabel="name"
+      optionValue="id"
+      placeholder="Keep current cluster"
+      styleClass="w-full"
+      [filter]="true"
+      filterPlaceholder="Search clusters..."
+      [showClear]="true"
+    />
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button
+      label="Cancel"
+      severity="secondary"
+      (click)="showEditDialog = false"
+    />
+    <p-button
+      label="Save"
+      icon="pi pi-check"
+      (click)="updateTenant()"
+      [loading]="saving()"
+    />
+  </ng-template>
+</p-dialog>
+
+<!-- Tenant Users Dialog -->
+<p-dialog
+  header="Users: {{ selectedTenant?.name }}"
+  [(visible)]="showUsersDialog"
+  [modal]="true"
+  [style]="{ width: '600px' }"
+  [draggable]="false"
+>
+  <div class="mb-3">
+    <p-table [value]="tenantUsers()" [loading]="loadingUsers()" styleClass="p-datatable-sm">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>User</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-membership>
+        <tr>
+          <td>{{ membership.userEmail || membership.userId }}</td>
+          <td>{{ membership.role }}</td>
+          <td>
+            <p-tag [value]="membership.status" severity="info" />
+          </td>
+          <td>
+            <p-button
+              icon="pi pi-times"
+              [rounded]="true"
+              [text]="true"
+              severity="danger"
+              pTooltip="Remove from tenant"
+              (click)="removeUserFromTenant(membership)"
+            />
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="4" class="text-center p-3 text-color-secondary">
+            No users in this tenant.
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <div class="border-top-1 surface-border pt-3">
+    <h4 class="mt-0 mb-3">Add User to Tenant</h4>
+    <div class="flex gap-2 align-items-end">
+      <div class="flex-1">
+        <label class="block mb-1 text-sm">User ID</label>
+        <input
+          pInputText
+          [(ngModel)]="addUserId"
+          class="w-full"
+          placeholder="User UUID"
+        />
+      </div>
+      <div class="flex-1">
+        <label class="block mb-1 text-sm">Role</label>
+        <p-select
+          [options]="roleOptions"
+          [(ngModel)]="addUserRole"
+          styleClass="w-full"
+        />
+      </div>
+      <p-button
+        label="Add"
+        icon="pi pi-plus"
+        (click)="assignUser()"
+        [loading]="savingUser()"
+        [disabled]="!addUserId.trim()"
+      />
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <p-button
+      label="Close"
+      severity="secondary"
+      (click)="showUsersDialog = false"
+    />
+  </ng-template>
+</p-dialog>

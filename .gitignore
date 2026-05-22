@@ -17,3 +17,6 @@ Thumbs.db
 
 # Claude memory (local-only)
 .claude/
+*/.angular/*
+*/dist/*
+*/node_modules/*

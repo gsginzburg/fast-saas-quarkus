@@ -33,6 +33,8 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.gsginzburg.dispatch.converter.ClusterConverter;
 import org.gsginzburg.dispatch.domain.dto.ClusterDto;
+import org.gsginzburg.dispatch.domain.model.Cluster;
+import org.gsginzburg.dispatch.service.ClusterManagementClient;
 import org.gsginzburg.dispatch.service.ClusterService;
 import org.gsginzburg.shared.dto.ApiResponse;
 import org.gsginzburg.shared.dto.PageDto;
@@ -48,6 +50,7 @@ public class ClusterResource {
 
     @Inject ClusterService clusterService;
     @Inject ClusterConverter clusterConverter;
+    @Inject ClusterManagementClient clusterManagementClient;
 
     @GET
     @Path("/all")
@@ -72,7 +75,8 @@ public class ClusterResource {
     public Response createCluster(@Valid ClusterDto request) {
         return Response.status(201)
                 .entity(ApiResponse.ok(clusterConverter.toDto(
-                        clusterService.createCluster(request.name(), request.url()))))
+                        clusterService.createCluster(
+                                request.name(), request.url(), request.apiUrl()))))
                 .build();
     }
 
@@ -80,13 +84,22 @@ public class ClusterResource {
     @Path("/{id}")
     public ApiResponse<ClusterDto> updateCluster(@PathParam("id") UUID id, @Valid ClusterDto request) {
         return ApiResponse.ok(clusterConverter.toDto(
-                clusterService.updateCluster(id, request.name(), request.url())));
+                clusterService.updateCluster(
+                        id, request.name(), request.url(), request.apiUrl())));
     }
 
     @DELETE
     @Path("/{id}")
     public ApiResponse<Void> deleteCluster(@PathParam("id") UUID id) {
         clusterService.deleteCluster(id);
+        return ApiResponse.ok();
+    }
+
+    @POST
+    @Path("/{id}/upgrade-all")
+    public ApiResponse<Void> upgradeAll(@PathParam("id") UUID id) {
+        Cluster cluster = clusterService.getCluster(id);
+        clusterManagementClient.upgradeAll(cluster.getApiUrl());
         return ApiResponse.ok();
     }
 }

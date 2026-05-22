@@ -1,0 +1,40 @@
+<div class="flex align-items-center justify-content-center min-h-screen">
+  <p-card header="Dispatch Management" [style]="{ width: '400px' }">
+    <form (ngSubmit)="login()">
+      <div class="field mb-4">
+        <label class="block mb-2 font-medium">Email</label>
+        <input
+          pInputText
+          type="email"
+          [(ngModel)]="email"
+          name="email"
+          class="w-full"
+          placeholder="admin@dispatch.local"
+          required
+        />
+      </div>
+      <div class="field mb-4">
+        <label class="block mb-2 font-medium">Password</label>
+        <p-password
+          [(ngModel)]="password"
+          name="password"
+          [feedback]="false"
+          styleClass="w-full"
+          inputStyleClass="w-full"
+          placeholder="Password"
+          [toggleMask]="true"
+        />
+      </div>
+      @if (error) {
+        <p-message severity="error" [text]="error" styleClass="w-full mb-3" />
+      }
+      <p-button
+        type="submit"
+        label="Sign In"
+        icon="pi pi-sign-in"
+        [loading]="loading"
+        styleClass="w-full"
+      />
+    </form>
+  </p-card>
+</div>

@@ -1,0 +1,18 @@
+<p-menubar [model]="menuItems">
+  <ng-template pTemplate="start">
+    <span class="font-bold text-xl mr-4">Dispatch</span>
+  </ng-template>
+  <ng-template pTemplate="end">
+    <span class="mr-3 text-sm">{{ currentUser?.email }}</span>
+    <p-button
+      label="Logout"
+      icon="pi pi-sign-out"
+      size="small"
+      severity="secondary"
+      (click)="logout()"
+    />
+  </ng-template>
+</p-menubar>
+<div class="layout-main">
+  <router-outlet />
+</div>

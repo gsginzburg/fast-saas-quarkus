@@ -26,6 +26,7 @@ public record ClusterDto(
         String id,
         @NotBlank String name,
         @NotBlank String url,
+        String apiUrl,
         String status,
         OffsetDateTime createdAt
 ) {}

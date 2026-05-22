@@ -20,7 +20,6 @@ import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.identity.IdentityProviderManager;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.quarkus.security.identity.request.AuthenticationRequest;
-import io.quarkus.security.identity.request.TokenAuthenticationRequest;
 import io.quarkus.security.runtime.QuarkusPrincipal;
 import io.quarkus.security.runtime.QuarkusSecurityIdentity;
 import io.quarkus.vertx.http.runtime.security.ChallengeData;
@@ -73,6 +72,6 @@ public class JwtAuthMechanism implements HttpAuthenticationMechanism {
 
     @Override
     public Set<Class<? extends AuthenticationRequest>> getCredentialTypes() {
-        return Set.of(TokenAuthenticationRequest.class);
+        return Set.of();
     }
 }

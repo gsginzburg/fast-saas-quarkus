@@ -36,11 +36,17 @@
         <!-- HikariCP for programmatic datasource creation in cluster-framework -->
         <hikaricp.version>7.0.2</hikaricp.version>
 
+        <!-- Caffeine cache for cluster-framework token validation -->
+        <caffeine.version>3.2.0</caffeine.version>
+
         <!-- Lombok -->
         <lombok.version>1.18.46</lombok.version>
 
         <!-- Byte Buddy – override transitive version for Java 25 support -->
         <bytebuddy.version>1.18.8</bytebuddy.version>
+
+        <!-- Playwright for E2E API testing -->
+        <playwright.version>1.60.0</playwright.version>
 
         <!-- Plugin versions -->
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
@@ -122,6 +128,12 @@
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
                 <version>3.27.7</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.microsoft.playwright</groupId>
+                <artifactId>playwright</artifactId>
+                <version>${playwright.version}</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>

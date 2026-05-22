@@ -30,6 +30,14 @@ public interface DispatchConfig {
     Jwt jwt();
     Cors cors();
     Auth auth();
+    Management management();
+
+    Internal internal();
+
+    interface Internal {
+        @WithDefault("change-me-internal-api-key")
+        String apiKey();
+    }
 
     interface Jwt {
         String secret();
@@ -40,13 +48,18 @@ public interface DispatchConfig {
         @WithDefault("28800")
         long backofficeTokenExpirySeconds();
 
-        @WithDefault("300")
-        long exchangeTokenExpirySeconds();
+        @WithDefault("28800")
+        long userTokenExpirySeconds();
     }
 
     interface Cors {
         @WithDefault("http://localhost:4200")
         String allowedOrigins();
+    }
+
+    interface Management {
+        @WithDefault("change-me-in-production")
+        String apiKey();
     }
 
     interface Auth {

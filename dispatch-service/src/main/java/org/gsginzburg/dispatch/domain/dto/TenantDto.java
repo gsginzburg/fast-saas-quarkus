@@ -29,6 +29,7 @@ public record TenantDto(
         @NotBlank String clusterId,
         String clusterName,
         String clusterUrl,
+        String deepLinkUrl,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {}

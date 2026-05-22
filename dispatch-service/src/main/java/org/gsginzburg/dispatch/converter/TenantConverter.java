@@ -18,10 +18,32 @@ package org.gsginzburg.dispatch.converter;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import org.gsginzburg.dispatch.domain.dto.TenantDto;
+import org.gsginzburg.dispatch.domain.model.Cluster;
 import org.gsginzburg.dispatch.domain.model.Tenant;
 import org.gsginzburg.shared.converter.DtoConverter;
+import org.gsginzburg.shared.util.Base62;
 
 @ApplicationScoped
 public class TenantConverter extends DtoConverter<TenantDto, Tenant> {
+
     public TenantConverter() { super(TenantDto.class, Tenant.class); }
+
+    @Override
+    public TenantDto toDto(Tenant entity) {
+        if (entity == null) return null;
+        Cluster cluster = entity.getCluster();
+        String clusterUrl = cluster != null ? cluster.getUrl() : null;
+        return TenantDto.builder()
+                .id(entity.getId() != null ? entity.getId().toString() : null)
+                .name(entity.getName())
+                .status(entity.getStatus() != null ? entity.getStatus().name() : null)
+                .clusterId(cluster != null ? cluster.getId().toString() : null)
+                .clusterName(cluster != null ? cluster.getName() : null)
+                .clusterUrl(clusterUrl)
+                .deepLinkUrl(clusterUrl != null && entity.getId() != null
+                        ? clusterUrl + "/c/" + Base62.encode(entity.getId()) : null)
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .build();
+    }
 }

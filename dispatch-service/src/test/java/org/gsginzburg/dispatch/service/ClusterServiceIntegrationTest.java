@@ -32,7 +32,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -104,7 +103,7 @@ public class ClusterServiceIntegrationTest extends AbstractIntegrationTest {
     void updateCluster_modifiesNameAndUrlInDb() {
         Cluster created = createCluster("Old Name", "https://old.internal");
 
-        clusterService.updateCluster(created.getId(), "New Name", "https://new.internal");
+        clusterService.updateCluster(created.getId(), "New Name", "https://new.internal", "");
 
         Cluster stored = clusterRepository.findByIdOptional(created.getId()).orElseThrow();
         assertThat(stored.getName()).isEqualTo("New Name");
@@ -136,7 +135,7 @@ public class ClusterServiceIntegrationTest extends AbstractIntegrationTest {
         createCluster("Unique Cluster", "https://unique.internal");
 
         assertThatThrownBy(() ->
-                clusterService.createCluster("Unique Cluster", "https://other.internal"))
+                clusterService.createCluster("Unique Cluster", "https://other.internal", ""))
                 .isInstanceOf(Exception.class);
     }
 
@@ -147,7 +146,7 @@ public class ClusterServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Cluster createCluster(String name, String url) {
-        return clusterService.createCluster(name, url);
+        return clusterService.createCluster(name, url, "");
     }
 
     private int queryForInt(String sql, Object... args) {
