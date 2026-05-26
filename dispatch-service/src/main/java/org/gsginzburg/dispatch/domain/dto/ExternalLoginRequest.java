@@ -14,19 +14,11 @@
  * limitations under the License.
  */
 
-package org.gsginzburg.cluster.framework.security;
+package org.gsginzburg.dispatch.domain.dto;
 
-import java.util.List;
+import jakarta.validation.constraints.NotBlank;
 
-public record ValidatedToken(
-        String userId,
-        String email,
-        String userName,
-        String userType,
-        String tenantId,
-        String tenantName,
-        String tenantStatus,
-        String clusterName,
-        String clusterUrl,
-        List<String> roles
+public record ExternalLoginRequest(
+        @NotBlank String provider,
+        @NotBlank String externalToken
 ) {}

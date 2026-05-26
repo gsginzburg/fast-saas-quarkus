@@ -18,8 +18,11 @@ package org.gsginzburg.dispatch.service;
 
 import io.quarkus.elytron.security.common.BcryptUtil;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
+import org.gsginzburg.dispatch.auth.provider.ExternalAuthProvider;
 import org.gsginzburg.dispatch.domain.model.AppUser;
 import org.gsginzburg.dispatch.domain.model.UserStatus;
 import org.gsginzburg.dispatch.domain.repository.AppUserRepository;
@@ -29,10 +32,12 @@ import org.gsginzburg.shared.security.UserType;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @ApplicationScoped
 public class UserService {
 
     @Inject AppUserRepository userRepository;
+    @Inject Instance<ExternalAuthProvider> externalAuthProviders;
 
     public PageDto<AppUser> getUsers(int page, int size) {
         var query = userRepository.queryAll();
@@ -53,16 +58,27 @@ public class UserService {
 
     @Transactional
     public AppUser createUser(String email, String password,
-                              String firstName, String lastName, UserType userType) {
+                              String firstName, String lastName,
+                              UserType userType, String authProvider) {
         AppUser user = AppUser.builder()
                 .email(email)
                 .passwordHash(BcryptUtil.bcryptHash(password))
                 .firstName(firstName)
                 .lastName(lastName)
                 .userType(userType)
+                .authProvider(authProvider)
                 .status(UserStatus.ACTIVE)
                 .build();
         userRepository.persist(user);
+
+        if (authProvider != null) {
+            ExternalAuthProvider provider = externalAuthProviders.stream()
+                    .filter(p -> p.getProviderId().equals(authProvider) && p.isEnabled())
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Auth provider not available: " + authProvider));
+            provider.provisionUser(email, password, firstName, lastName);
+        }
+
         return user;
     }
 
@@ -75,7 +91,17 @@ public class UserService {
 
     @Transactional
     public void deleteUser(UUID id) {
-        findUser(id).setStatus(UserStatus.INACTIVE);
+        AppUser user = findUser(id);
+        if (user.getAuthProvider() != null) {
+            externalAuthProviders.stream()
+                    .filter(p -> p.getProviderId().equals(user.getAuthProvider()) && p.isEnabled())
+                    .findFirst()
+                    .ifPresentOrElse(
+                            p -> p.deprovisionUser(user.getEmail()),
+                            () -> log.warn("Auth provider '{}' not available for deprovisioning user '{}'",
+                                    user.getAuthProvider(), user.getEmail()));
+        }
+        user.setStatus(UserStatus.INACTIVE);
     }
 
     private AppUser findUser(UUID id) {

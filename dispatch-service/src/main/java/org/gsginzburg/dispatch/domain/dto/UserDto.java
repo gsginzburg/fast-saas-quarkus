@@ -34,6 +34,7 @@ public record UserDto(
         @NotBlank String firstName,
         @NotBlank String lastName,
         @NotBlank String userType,
+        String authProvider,
         String status,
         List<TenantMembershipDto> tenantMemberships,
         OffsetDateTime createdAt

@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
@@ -104,7 +105,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     @AfterEach
     void cleanup() {
         DbProvisioner.runPsql("dispatch-test",
-                "TRUNCATE dispatch.access_token, dispatch.refresh_token, dispatch.tenant_user, dispatch.tenant, dispatch.app_user, dispatch.cluster CASCADE");
+                "TRUNCATE dispatch.refresh_token, dispatch.tenant_user, dispatch.tenant, dispatch.app_user, dispatch.cluster CASCADE");
     }
 
     @Test
@@ -246,12 +247,47 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void jwks_alwaysReturns200() {
+    void jwks_returnsValidRS256JwkSet() {
         given()
             .get("/api/auth/jwks")
         .then()
             .statusCode(200)
-            .body("keys", notNullValue());
+            .body("keys", notNullValue())
+            .body("keys[0].kty", is("RSA"))
+            .body("keys[0].alg", is("RS256"));
+    }
+
+    @Test
+    void loginExternal_unknownProvider_returns400() {
+        given()
+            .contentType(ContentType.JSON)
+            .body(Map.of("provider", "unknown-provider", "externalToken", "some-token"))
+            .post("/api/auth/login/external")
+        .then()
+            .statusCode(400);
+    }
+
+    @Test
+    void loginExternal_invalidExternalToken_returns401() {
+        given()
+            .contentType(ContentType.JSON)
+            .body(Map.of("provider", "test-provider", "externalToken", "bad-token"))
+            .post("/api/auth/login/external")
+        .then()
+            .statusCode(401);
+    }
+
+    @Test
+    void loginExternal_validTokenButUserNotFound_returns404() {
+        // MockExternalAuthProvider validates "valid-test-token" → "mock-external@test.com",
+        // but no such user exists in the DB.
+        given()
+            .contentType(ContentType.JSON)
+            .body(Map.of("provider", "test-provider", "externalToken", "valid-test-token"))
+            .post("/api/auth/login/external")
+        .then()
+            .statusCode(404)
+            .body("error", containsString("mock-external@test.com"));
     }
 
     @Test

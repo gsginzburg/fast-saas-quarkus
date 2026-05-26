@@ -33,5 +33,10 @@ public record JwtClaims(
         String email,
         List<String> roles,
         Instant issuedAt,
-        Instant expiresAt
+        Instant expiresAt,
+        String userName,
+        String userType,
+        String tenantName,
+        String tenantStatus,
+        String clusterName
 ) {}

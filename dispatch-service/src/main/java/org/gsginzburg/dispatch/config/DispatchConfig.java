@@ -32,15 +32,9 @@ public interface DispatchConfig {
     Auth auth();
     Management management();
 
-    Internal internal();
-
-    interface Internal {
-        @WithDefault("change-me-internal-api-key")
-        String apiKey();
-    }
-
     interface Jwt {
-        String secret();
+        /** Base64-encoded PKCS8 DER RSA private key. Empty = auto-generate ephemeral key. */
+        Optional<String> privateKeyPem();
 
         @WithDefault("dispatch")
         String issuer();
@@ -74,10 +68,19 @@ public interface DispatchConfig {
 
             @WithDefault("us-east-1")
             String region();
+
+            /** Override JWKS URL (for testing). Empty = derive from region + userPoolId. */
+            Optional<String> jwksUrlOverride();
         }
 
         interface Firebase {
             Optional<String> projectId();
+
+            /** Override JWKS URL (for testing). Empty = use Google's public URL. */
+            Optional<String> jwksUrlOverride();
+
+            /** Base64-encoded Firebase service account JSON. Empty = use GOOGLE_APPLICATION_CREDENTIALS env. */
+            Optional<String> serviceAccountJson();
         }
     }
 }

@@ -74,18 +74,22 @@
             <artifactId>quarkus-smallrye-health</artifactId>
         </dependency>
 
-        <!-- JWT library (HS256) -->
+        <!-- Nimbus JOSE+JWT (RS256) -->
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-api</artifactId>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
         </dependency>
+
+        <!-- AWS SDK v2 – Cognito user management -->
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>cognitoidentityprovider</artifactId>
         </dependency>
+
+        <!-- Firebase Admin SDK – Firebase user management -->
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-jackson</artifactId>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
         </dependency>
 
         <!-- BCrypt (Elytron) -->
@@ -114,6 +118,11 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

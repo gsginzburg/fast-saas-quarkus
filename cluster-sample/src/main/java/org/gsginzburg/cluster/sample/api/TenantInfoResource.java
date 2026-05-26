@@ -53,8 +53,7 @@ public class TenantInfoResource {
         context.put("user", Map.of(
                 "id",        vt.userId() != null ? vt.userId() : "",
                 "email",     vt.email() != null ? vt.email() : "",
-                "firstName", vt.firstName() != null ? vt.firstName() : "",
-                "lastName",  vt.lastName() != null ? vt.lastName() : "",
+                "userName",  vt.userName() != null ? vt.userName() : "",
                 "userType",  vt.userType() != null ? vt.userType() : "",
                 "roles",     vt.roles() != null ? vt.roles() : java.util.List.of()
         ));

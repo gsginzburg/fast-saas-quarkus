@@ -98,11 +98,16 @@
             <artifactId>HikariCP</artifactId>
         </dependency>
 
+        <!-- Nimbus JOSE+JWT for local RS256 JWT verification -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+        </dependency>
+
         <!-- Caffeine cache for validated token results -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
-            <version>${caffeine.version}</version>
         </dependency>
 
         <!-- Lombok -->

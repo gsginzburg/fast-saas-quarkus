@@ -29,6 +29,7 @@ import jakarta.ws.rs.core.Response;
 import io.quarkus.security.Authenticated;
 import io.quarkus.security.identity.SecurityIdentity;
 import org.gsginzburg.dispatch.auth.jwt.DispatchJwtService;
+import org.gsginzburg.dispatch.domain.dto.ExternalLoginRequest;
 import org.gsginzburg.dispatch.domain.dto.LoginRequest;
 import org.gsginzburg.dispatch.domain.dto.LoginResponse;
 import org.gsginzburg.dispatch.domain.dto.RefreshTokenRequest;
@@ -53,6 +54,12 @@ public class AuthResource {
     @Path("/login")
     public ApiResponse<LoginResponse> login(@Valid LoginRequest request) {
         return ApiResponse.ok(authService.login(request));
+    }
+
+    @POST
+    @Path("/login/external")
+    public ApiResponse<LoginResponse> loginExternal(@Valid ExternalLoginRequest request) {
+        return ApiResponse.ok(authService.loginWithExternalToken(request.externalToken(), request.provider()));
     }
 
     @POST

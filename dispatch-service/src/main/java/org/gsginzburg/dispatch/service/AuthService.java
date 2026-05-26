@@ -28,12 +28,10 @@ import org.gsginzburg.dispatch.domain.dto.LoginRequest;
 import org.gsginzburg.dispatch.domain.dto.LoginResponse;
 import org.gsginzburg.dispatch.domain.dto.ScopedTokenResponse;
 import org.gsginzburg.dispatch.domain.model.AppUser;
-import org.gsginzburg.dispatch.domain.model.AccessToken;
 import org.gsginzburg.dispatch.domain.model.RefreshToken;
 import org.gsginzburg.dispatch.domain.model.Tenant;
 import org.gsginzburg.dispatch.domain.model.TenantUser;
 import org.gsginzburg.dispatch.domain.model.UserStatus;
-import org.gsginzburg.dispatch.domain.repository.AccessTokenRepository;
 import org.gsginzburg.dispatch.domain.repository.AppUserRepository;
 import org.gsginzburg.dispatch.domain.repository.RefreshTokenRepository;
 import org.gsginzburg.dispatch.domain.repository.TenantRepository;
@@ -62,7 +60,6 @@ public class AuthService {
     @Inject TenantUserRepository tenantUserRepository;
     @Inject TenantRepository tenantRepository;
     @Inject RefreshTokenRepository refreshTokenRepository;
-    @Inject AccessTokenRepository accessTokenRepository;
     @Inject JwtService jwtService;
     @Inject Instance<ExternalAuthProvider> externalAuthProviders;
     @Inject DispatchConfig config;
@@ -88,19 +85,25 @@ public class AuthService {
         ExternalAuthProvider provider = externalAuthProviders.stream()
                 .filter(p -> p.getProviderId().equals(providerName) && p.isEnabled())
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Auth provider not available: " + providerName));
+                .orElseThrow(() -> new DispatchException("Auth provider not available: " + providerName, 400));
 
         String email = provider.verifyTokenAndGetEmail(externalToken);
         if (email == null) {
             log.warn("Authentication failed: external token rejected by provider '{}'", providerName);
-            throw new RuntimeException("Invalid external token");
+            throw new DispatchException("Invalid external token", 401);
         }
 
         AppUser user = userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE)
                 .orElseThrow(() -> {
                     log.warn("Authentication failed: no active user for external identity '{}' (provider '{}')", email, providerName);
-                    return new RuntimeException("User not found: " + email);
+                    return new DispatchException("User not found for external identity: " + email, 404);
                 });
+
+        if (!providerName.equals(user.getAuthProvider())) {
+            log.warn("Authentication failed: user '{}' authProvider='{}' does not match requested provider '{}'",
+                    email, user.getAuthProvider(), providerName);
+            throw new DispatchException("This account is not configured for " + providerName + " authentication", 401);
+        }
 
         return buildLoginResponse(user);
     }
@@ -108,7 +111,11 @@ public class AuthService {
     private LoginResponse buildLoginResponse(AppUser user) {
         long expiry;
         String clusterUrl = null;
+        String clusterId = null;
         String tenantId = null;
+        String tenantName = null;
+        String tenantStatus = null;
+        String clusterName = null;
         List<String> roles;
 
         if (user.getUserType() == UserType.BACKOFFICE) {
@@ -121,25 +128,36 @@ public class AuthService {
             if (!tenantUsers.isEmpty()) {
                 TenantUser tu = tenantUsers.get(0);
                 tenantId = tu.getTenantId().toString();
-                Tenant tenant = tenantRepository.findByIdOptional(tu.getTenantId()).orElseThrow();
+                Tenant tenant = tenantRepository.findByIdWithCluster(tu.getTenantId()).orElseThrow();
                 clusterUrl = tenant.getCluster().getUrl();
+                clusterId = tenant.getCluster().getId().toString();
+                tenantName = tenant.getName();
+                tenantStatus = tenant.getStatus().name();
+                clusterName = tenant.getCluster().getName();
                 roles = List.of(tu.getRole().name());
             }
         }
+
+        String userName = trim(user.getFirstName()) + " " + trim(user.getLastName());
 
         Instant now = Instant.now();
         JwtClaims claims = JwtClaims.builder()
                 .sub(user.getId().toString())
                 .email(user.getEmail())
+                .userName(userName.isBlank() ? null : userName.strip())
+                .userType(user.getUserType().name())
                 .tenantId(tenantId)
                 .clusterUrl(clusterUrl)
+                .clusterId(clusterId)
+                .tenantName(tenantName)
+                .tenantStatus(tenantStatus)
+                .clusterName(clusterName)
                 .roles(roles)
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(expiry))
                 .build();
 
         String accessToken = jwtService.generateToken(claims);
-        saveAccessToken(user.getId(), accessToken, now.plusSeconds(expiry));
         String rawRefreshToken = generateRefreshToken();
         saveRefreshToken(user.getId(), rawRefreshToken);
 
@@ -179,7 +197,7 @@ public class AuthService {
 
     @Transactional
     public ScopedTokenResponse scopeToTenant(String userId, String tenantId) {
-        tenantRepository.findByIdOptional(UUID.fromString(tenantId))
+        Tenant tenant = tenantRepository.findByIdWithCluster(UUID.fromString(tenantId))
                 .orElseThrow(() -> new DispatchException("Tenant not found", 404));
 
         long expiry = config.jwt().backofficeTokenExpirySeconds();
@@ -188,13 +206,17 @@ public class AuthService {
         JwtClaims claims = JwtClaims.builder()
                 .sub(userId)
                 .tenantId(tenantId)
+                .tenantName(tenant.getName())
+                .tenantStatus(tenant.getStatus().name())
+                .clusterUrl(tenant.getCluster().getUrl())
+                .clusterId(tenant.getCluster().getId().toString())
+                .clusterName(tenant.getCluster().getName())
                 .roles(List.of("BACKOFFICE"))
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(expiry))
                 .build();
 
         String token = jwtService.generateToken(claims);
-        saveAccessToken(UUID.fromString(userId), token, now.plusSeconds(expiry));
         return new ScopedTokenResponse(token, expiry);
     }
 
@@ -203,18 +225,14 @@ public class AuthService {
         refreshTokenRepository.revokeAllForUser(userId);
     }
 
+    private String trim(String s) {
+        return s != null ? s.trim() : "";
+    }
+
     private String generateRefreshToken() {
         byte[] bytes = new byte[64];
         new SecureRandom().nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    private void saveAccessToken(UUID userId, String rawToken, Instant expiresAt) {
-        accessTokenRepository.persist(AccessToken.builder()
-                .userId(userId)
-                .tokenHash(hashToken(rawToken))
-                .expiresAt(OffsetDateTime.ofInstant(expiresAt, java.time.ZoneOffset.UTC))
-                .build());
     }
 
     private void saveRefreshToken(UUID userId, String rawToken) {

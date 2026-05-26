@@ -58,6 +58,9 @@ public class AppUser extends PanacheEntityBase {
     @Column(name = "last_name")
     public String lastName;
 
+    @Column(name = "auth_provider")
+    public String authProvider;
+
     @Column(name = "user_type", nullable = false)
     @Enumerated(EnumType.STRING)
     public UserType userType;

@@ -72,7 +72,8 @@ public class UserResource {
                                 request.password(),
                                 request.firstName(),
                                 request.lastName(),
-                                UserType.valueOf(request.userType())))))
+                                UserType.valueOf(request.userType()),
+                                request.authProvider()))))
                 .build();
     }
 

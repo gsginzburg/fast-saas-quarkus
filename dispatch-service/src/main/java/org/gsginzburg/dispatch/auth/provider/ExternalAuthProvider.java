@@ -21,12 +21,25 @@ package org.gsginzburg.dispatch.auth.provider;
  * Implement and register as a CDI bean to enable external auth.
  */
 public interface ExternalAuthProvider {
-    /** Provider identifier, e.g. "cognito" or "firebase" */
+
+    /** Provider identifier, e.g. "cognito" or "firebase". */
     String getProviderId();
 
-    /** Verify the external token and return the user's email if valid, null otherwise */
+    /** Verify the external token and return the user's email if valid, null otherwise. */
     String verifyTokenAndGetEmail(String externalToken);
 
-    /** Return true if this provider is configured and should be used */
+    /** Return true if this provider is configured and should be used. */
     boolean isEnabled();
+
+    /**
+     * Create the user in the external provider with the given credentials.
+     * Called after the user is persisted in dispatch-service.
+     */
+    void provisionUser(String email, String password, String firstName, String lastName);
+
+    /**
+     * Delete the user from the external provider.
+     * Called before the user is soft-deleted in dispatch-service.
+     */
+    void deprovisionUser(String email);
 }

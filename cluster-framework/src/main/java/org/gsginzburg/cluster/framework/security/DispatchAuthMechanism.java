@@ -18,6 +18,17 @@ package org.gsginzburg.cluster.framework.security;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
+import com.nimbusds.jose.proc.BadJOSEException;
+import com.nimbusds.jose.proc.JWSVerificationKeySelector;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
+import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
+import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import io.quarkus.security.identity.IdentityProviderManager;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.quarkus.security.identity.request.AuthenticationRequest;
@@ -33,7 +44,11 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import org.gsginzburg.cluster.framework.config.ClusterConfig;
 
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.text.ParseException;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
@@ -45,12 +60,27 @@ import java.util.Set;
 @Priority(1)
 public class DispatchAuthMechanism implements HttpAuthenticationMechanism {
 
-    @Inject DispatchValidationClient validationClient;
+    @Inject ClusterConfig config;
 
+    private ConfigurableJWTProcessor<SecurityContext> jwtProcessor;
     private Cache<String, ValidatedToken> tokenCache;
 
     @PostConstruct
     void init() {
+        try {
+            JWKSource<SecurityContext> jwkSource = JWKSourceBuilder
+                    .<SecurityContext>create(URI.create(config.dispatchUrl() + "/api/auth/jwks").toURL())
+                    .build();
+
+            ConfigurableJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
+            processor.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, jwkSource));
+            processor.setJWTClaimsSetVerifier(new DefaultJWTClaimsVerifier<>(
+                    null, new HashSet<>(Set.of("sub", "exp"))));
+            this.jwtProcessor = processor;
+        } catch (MalformedURLException e) {
+            throw new RuntimeException("Invalid dispatch URL: " + config.dispatchUrl(), e);
+        }
+
         tokenCache = Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofHours(2))
                 .expireAfterAccess(Duration.ofMinutes(30))
@@ -77,7 +107,7 @@ public class DispatchAuthMechanism implements HttpAuthenticationMechanism {
         return Uni.createFrom().item(token)
                 .emitOn(Infrastructure.getDefaultWorkerPool())
                 .map(t -> {
-                    ValidatedToken vt = validationClient.validate(t);
+                    ValidatedToken vt = validateLocally(t);
                     if (vt != null) {
                         tokenCache.put(t, vt);
                     }
@@ -89,6 +119,37 @@ public class DispatchAuthMechanism implements HttpAuthenticationMechanism {
                 })
                 .map(Optional::ofNullable)
                 .onItem().transformToUni(opt -> Uni.createFrom().optional(opt));
+    }
+
+    private ValidatedToken validateLocally(String token) {
+        try {
+            JWTClaimsSet claims = jwtProcessor.process(token, null);
+            return buildValidatedToken(claims);
+        } catch (BadJOSEException | ParseException | JOSEException e) {
+            log.debug("JWT validation failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private ValidatedToken buildValidatedToken(JWTClaimsSet claims) {
+        List<String> roles = List.of();
+        Object rawRoles = claims.getClaim("roles");
+        if (rawRoles instanceof List<?> list) {
+            roles = list.stream().map(Object::toString).toList();
+        }
+        return new ValidatedToken(
+                claims.getSubject(),
+                (String) claims.getClaim("email"),
+                (String) claims.getClaim("user_name"),
+                (String) claims.getClaim("user_type"),
+                (String) claims.getClaim("tenant_id"),
+                (String) claims.getClaim("tenant_name"),
+                (String) claims.getClaim("tenant_status"),
+                (String) claims.getClaim("cluster_name"),
+                (String) claims.getClaim("cluster_url"),
+                roles
+        );
     }
 
     private SecurityIdentity buildIdentity(String token, ValidatedToken vt, RoutingContext context) {

@@ -28,7 +28,6 @@ public interface ClusterConfig {
     String id();
     String name();
     String dispatchUrl();
-    String dispatchInternalApiKey();
     Management management();
     Map<String, ShardConfig> shards();
     PathTenantInjection pathTenantInjection();

@@ -30,14 +30,26 @@
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.version>3.35.3</quarkus.platform.version>
 
-        <!-- JWT library (HS256, shared with dispatch + cluster) -->
-        <jjwt.version>0.13.0</jjwt.version>
+        <!-- Nimbus JOSE+JWT (RS256, shared with dispatch + cluster) -->
+        <nimbus-jose-jwt.version>10.3</nimbus-jose-jwt.version>
+
+        <!-- WireMock for integration tests -->
+        <wiremock.version>3.13.1</wiremock.version>
 
         <!-- HikariCP for programmatic datasource creation in cluster-framework -->
         <hikaricp.version>7.0.2</hikaricp.version>
 
         <!-- Caffeine cache for cluster-framework token validation -->
         <caffeine.version>3.2.0</caffeine.version>
+
+        <!-- AWS SDK v2 (Cognito user management) -->
+        <aws-sdk.version>2.34.0</aws-sdk.version>
+
+        <!-- Firebase Admin SDK (Firebase user management) -->
+        <firebase-admin.version>9.5.0</firebase-admin.version>
+
+        <!-- Guava -->
+        <guava.version>33.6.0-jre</guava.version>
 
         <!-- Lombok -->
         <lombok.version>1.18.46</lombok.version>
@@ -77,23 +89,50 @@
                 <version>${project.version}</version>
             </dependency>
 
-            <!-- JWT -->
+            <!-- Nimbus JOSE+JWT (RS256) -->
             <dependency>
-                <groupId>io.jsonwebtoken</groupId>
-                <artifactId>jjwt-api</artifactId>
-                <version>${jjwt.version}</version>
+                <groupId>com.nimbusds</groupId>
+                <artifactId>nimbus-jose-jwt</artifactId>
+                <version>${nimbus-jose-jwt.version}</version>
             </dependency>
+
+            <!-- AWS SDK v2 BOM -->
             <dependency>
-                <groupId>io.jsonwebtoken</groupId>
-                <artifactId>jjwt-impl</artifactId>
-                <version>${jjwt.version}</version>
-                <scope>runtime</scope>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws-sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
+
+            <!-- Firebase Admin SDK -->
             <dependency>
-                <groupId>io.jsonwebtoken</groupId>
-                <artifactId>jjwt-jackson</artifactId>
-                <version>${jjwt.version}</version>
-                <scope>runtime</scope>
+                <groupId>com.google.firebase</groupId>
+                <artifactId>firebase-admin</artifactId>
+                <version>${firebase-admin.version}</version>
+            </dependency>
+
+            <!-- Guava -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
+
+            <!-- Force httpclient5 >= 5.5: WireMock 3.13.1 needs setProtocolUpgradeEnabled
+                 (added in 5.4); Firebase Admin 9.x brings in 5.3.1. -->
+            <dependency>
+                <groupId>org.apache.httpcomponents.client5</groupId>
+                <artifactId>httpclient5</artifactId>
+                <version>5.5.2</version>
+            </dependency>
+
+            <!-- WireMock (test) -->
+            <dependency>
+                <groupId>org.wiremock</groupId>
+                <artifactId>wiremock</artifactId>
+                <version>${wiremock.version}</version>
+                <scope>test</scope>
             </dependency>
 
             <!-- HikariCP (programmatic datasources in cluster-framework) -->
