@@ -174,6 +174,13 @@ public abstract class DtoConverter<D, E> {
 
         if (targetType.isAssignableFrom(sourceType)) return value;
 
+        // Integer.TYPE == int.class, Long.TYPE == long.class, etc.
+        // so if the source is the wrapper for this primitive target, pass it through.
+        if (targetType.isPrimitive()) {
+            try { if (sourceType.getField("TYPE").get(null) == targetType) return value; }
+            catch (Exception ignored) {}
+        }
+
         // String ↔ UUID for *id properties (case-insensitive "id" suffix)
         if (propName.toLowerCase().endsWith("id")) {
             if (targetType == String.class && value instanceof UUID uuid) {
