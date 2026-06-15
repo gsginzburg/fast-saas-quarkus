@@ -58,6 +58,8 @@ public class DispatchJwtService implements JwtService {
     private RSAKey rsaJwk;
     private String issuer;
 
+    private static final String KID = "dispatch-service-1050936859";
+
     @PostConstruct
     void init() {
         issuer = config.jwt().issuer();
@@ -81,7 +83,7 @@ public class DispatchJwtService implements JwtService {
                         .privateKey(privateKey)
                         .keyUse(KeyUse.SIGNATURE)
                         .algorithm(JWSAlgorithm.RS256)
-                        .keyID(UUID.randomUUID().toString())
+                        .keyID(KID)
                         .build();
                 log.info("JWT RS256 key loaded from configuration");
             } else {
@@ -94,7 +96,7 @@ public class DispatchJwtService implements JwtService {
                         .privateKey((RSAPrivateKey) kp.getPrivate())
                         .keyUse(KeyUse.SIGNATURE)
                         .algorithm(JWSAlgorithm.RS256)
-                        .keyID(UUID.randomUUID().toString())
+                        .keyID(KID)
                         .build();
             }
         } catch (Exception e) {
