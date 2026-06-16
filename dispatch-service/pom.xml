@@ -86,10 +86,11 @@
             <artifactId>cognitoidentityprovider</artifactId>
         </dependency>
 
-        <!-- Firebase Admin SDK – Firebase user management -->
+        <!-- Firebase Admin via Quarkiverse Google Cloud Services — Firebase user management.
+             Brings in firebase-admin transitively with the native-image config it needs. -->
         <dependency>
-            <groupId>com.google.firebase</groupId>
-            <artifactId>firebase-admin</artifactId>
+            <groupId>io.quarkiverse.googlecloudservices</groupId>
+            <artifactId>quarkus-google-cloud-firebase-admin</artifactId>
         </dependency>
 
         <!-- BCrypt (Elytron) -->

@@ -16,9 +16,6 @@
 
 package org.gsginzburg.dispatch.auth.provider;
 
-import com.google.auth.oauth2.GoogleCredentials;
-import com.google.firebase.FirebaseApp;
-import com.google.firebase.FirebaseOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
@@ -35,16 +32,15 @@ import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.WebApplicationException;
 import lombok.extern.slf4j.Slf4j;
 import org.gsginzburg.dispatch.config.DispatchConfig;
 
-import java.io.ByteArrayInputStream;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.text.ParseException;
-import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -55,6 +51,15 @@ public class FirebaseAuthProvider implements ExternalAuthProvider {
 
     @Inject
     DispatchConfig config;
+
+    /**
+     * FirebaseAuth bean produced by the quarkus-google-cloud-firebase-admin extension.
+     * Injected as an {@link Instance} so it is resolved lazily: the underlying FirebaseApp is
+     * only built when this provider is actually used for provisioning, not when the bean is
+     * created during provider discovery in native/cognito deployments.
+     */
+    @Inject
+    Instance<FirebaseAuth> firebaseAuth;
 
     private ConfigurableJWTProcessor<SecurityContext> jwtProcessor;
     private String projectId;
@@ -89,27 +94,6 @@ public class FirebaseAuthProvider implements ExternalAuthProvider {
             throw new RuntimeException("Invalid Firebase JWKS URL: " + jwksUrl, e);
         }
 
-        try {
-            if (FirebaseApp.getApps().isEmpty()) {
-                GoogleCredentials credentials;
-                String serviceAccountJson = config.auth().firebase().serviceAccountJson()
-                        .filter(s -> !s.isBlank())
-                        .orElse(null);
-                if (serviceAccountJson != null) {
-                    byte[] decoded = Base64.getDecoder().decode(serviceAccountJson);
-                    credentials = GoogleCredentials.fromStream(new ByteArrayInputStream(decoded));
-                } else {
-                    credentials = GoogleCredentials.getApplicationDefault();
-                }
-                FirebaseApp.initializeApp(FirebaseOptions.builder()
-                        .setCredentials(credentials)
-                        .setProjectId(projectId)
-                        .build());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize Firebase Admin SDK", e);
-        }
-
         log.info("FirebaseAuthProvider initialized for project '{}'", projectId);
     }
 
@@ -137,7 +121,7 @@ public class FirebaseAuthProvider implements ExternalAuthProvider {
     @Override
     public void provisionUser(String email, String password, String firstName, String lastName) {
         try {
-            FirebaseAuth.getInstance().createUser(new UserRecord.CreateRequest()
+            firebaseAuth.get().createUser(new UserRecord.CreateRequest()
                     .setEmail(email)
                     .setPassword(password)
                     .setDisplayName(firstName + " " + lastName)
@@ -152,8 +136,9 @@ public class FirebaseAuthProvider implements ExternalAuthProvider {
     @Override
     public void deprovisionUser(String email) {
         try {
-            UserRecord record = FirebaseAuth.getInstance().getUserByEmail(email);
-            FirebaseAuth.getInstance().deleteUser(record.getUid());
+            FirebaseAuth auth = firebaseAuth.get();
+            UserRecord record = auth.getUserByEmail(email);
+            auth.deleteUser(record.getUid());
             log.info("Deprovisioned Firebase user '{}'", email);
         } catch (FirebaseAuthException e) {
             if ("USER_NOT_FOUND".equals(e.getAuthErrorCode() != null ? e.getAuthErrorCode().name() : "")) {

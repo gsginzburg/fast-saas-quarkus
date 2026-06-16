@@ -45,8 +45,9 @@
         <!-- AWS SDK v2 (Cognito user management) -->
         <aws-sdk.version>2.34.0</aws-sdk.version>
 
-        <!-- Firebase Admin SDK (Firebase user management) -->
-        <firebase-admin.version>9.5.0</firebase-admin.version>
+        <!-- Quarkiverse Google Cloud Services — Firebase Admin extension (manages firebase-admin,
+             provides native-image config). 2.22.0 targets Quarkus 3.35.x. -->
+        <quarkus-google-cloud-services.version>2.22.0</quarkus-google-cloud-services.version>
 
         <!-- Guava -->
         <guava.version>33.6.0-jre</guava.version>
@@ -77,6 +78,17 @@
                 <scope>import</scope>
             </dependency>
 
+            <!-- Quarkiverse Google Cloud Services BOM – manages the Firebase Admin extension
+                 and its firebase-admin version. Imported after the Quarkus BOM so the platform
+                 wins any shared dependency version conflicts. -->
+            <dependency>
+                <groupId>io.quarkiverse.googlecloudservices</groupId>
+                <artifactId>quarkus-google-cloud-services-bom</artifactId>
+                <version>${quarkus-google-cloud-services.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
             <!-- Internal modules -->
             <dependency>
                 <groupId>org.gsginzburg</groupId>
@@ -103,13 +115,6 @@
                 <version>${aws-sdk.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-
-            <!-- Firebase Admin SDK -->
-            <dependency>
-                <groupId>com.google.firebase</groupId>
-                <artifactId>firebase-admin</artifactId>
-                <version>${firebase-admin.version}</version>
             </dependency>
 
             <!-- Guava -->

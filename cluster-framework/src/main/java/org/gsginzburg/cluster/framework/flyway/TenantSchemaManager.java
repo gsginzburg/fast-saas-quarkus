@@ -16,10 +16,14 @@
 
 package org.gsginzburg.cluster.framework.flyway;
 
+import io.quarkus.arc.InactiveBeanException;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.ResourceProvider;
+import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.gsginzburg.cluster.framework.config.ClusterConfig;
 
 import java.sql.Connection;
@@ -38,6 +42,15 @@ public class TenantSchemaManager {
 
     @Inject ClusterConfig clusterConfig;
 
+    /**
+     * Quarkus-managed Flyway for the default datasource, used only as the source of its
+     * build-time {@link ResourceProvider}. Reusing that provider lets the per-tenant
+     * Flyway below discover migrations in a GraalVM native image, where Flyway's own
+     * runtime classpath scan finds nothing. Wrapped in {@link Instance} because some
+     * deployments (e.g. framework tests with no active datasource) have no Flyway bean.
+     */
+    @Inject Instance<Flyway> managedFlyway;
+
     public void createTenantSchema(String tenantId, String shardId) throws Exception {
         ClusterConfig.ShardConfig shardConfig = clusterConfig.shards().get(shardId);
         if (shardConfig == null) throw new IllegalArgumentException("Shard not found: " + shardId);
@@ -48,15 +61,39 @@ public class TenantSchemaManager {
             stmt.execute("CREATE SCHEMA IF NOT EXISTS \"" + tenantId + "\"");
         }
 
-        Flyway flyway = Flyway.configure()
+        FluentConfiguration config = Flyway.configure()
                 .dataSource(shardConfig.jdbcUrl(), shardConfig.username(), shardConfig.password())
                 .schemas(tenantId)
                 .defaultSchema(tenantId)
-                .locations(INSTANCE_MIGRATIONS)
-                .load();
-        flyway.migrate();
+                .locations(INSTANCE_MIGRATIONS);
+
+        // Reuse Quarkus's build-time resource provider when an active managed Flyway exists,
+        // so migrations are discovered in a native image (Flyway's runtime classpath scan
+        // returns nothing there). Falls back to classpath scanning otherwise.
+        ResourceProvider provider = managedResourceProvider();
+        if (provider != null) {
+            config.resourceProvider(provider);
+        }
+
+        config.load().migrate();
 
         log.info("Created tenant schema {} on shard {}", tenantId, shardId);
+    }
+
+    /**
+     * The build-time resource provider from the Quarkus-managed Flyway, or {@code null}
+     * when no active Flyway bean is present (e.g. a deployment/test with no active
+     * datasource), in which case Flyway falls back to default classpath scanning.
+     */
+    private ResourceProvider managedResourceProvider() {
+        if (!managedFlyway.isResolvable()) {
+            return null;
+        }
+        try {
+            return managedFlyway.get().getConfiguration().getResourceProvider();
+        } catch (InactiveBeanException e) {
+            return null;
+        }
     }
 
     public void upgradeTenantSchema(String tenantId, String shardId) {
