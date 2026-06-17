@@ -92,6 +92,15 @@
             <artifactId>quarkus-elytron-security-common</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-agroal</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-postgresql</artifactId>
+        </dependency>
+
         <!-- HikariCP for direct-JDBC shard pool management -->
         <dependency>
             <groupId>com.zaxxer</groupId>

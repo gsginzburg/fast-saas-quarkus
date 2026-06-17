@@ -16,8 +16,11 @@
 
 package org.gsginzburg.cluster.framework.datasource;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import io.agroal.api.AgroalDataSource;
+import io.agroal.api.configuration.AgroalConnectionPoolConfiguration.ConnectionValidator;
+import io.agroal.api.configuration.supplier.AgroalDataSourceConfigurationSupplier;
+import io.agroal.api.security.NamePrincipal;
+import io.agroal.api.security.SimplePassword;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -41,7 +44,7 @@ public class ShardDataSourceRegistry {
 
     @Inject ClusterConfig clusterConfig;
 
-    private final Map<String, HikariDataSource> pools = new ConcurrentHashMap<>();
+    private final Map<String, AgroalDataSource> pools = new ConcurrentHashMap<>();
 
     @PostConstruct
     public void initialize() {
@@ -53,15 +56,23 @@ public class ShardDataSourceRegistry {
                 continue;
             }
             try {
-                HikariConfig hikari = new HikariConfig();
-                hikari.setJdbcUrl(cfg.jdbcUrl());
-                hikari.setDriverClassName(cfg.driverClassName());
-                hikari.setUsername(cfg.username());
-                hikari.setPassword(cfg.password());
-                hikari.setMaximumPoolSize(cfg.maxPoolSize());
-                hikari.setMinimumIdle(cfg.minIdle());
-                hikari.setPoolName("shard-" + shardId);
-                pools.put(shardId, new HikariDataSource(hikari));
+                AgroalDataSourceConfigurationSupplier configuration = new AgroalDataSourceConfigurationSupplier()
+                    .connectionPoolConfiguration(cp -> cp
+                        .maxSize(cfg.maxPoolSize())
+                        .minSize(cfg.minIdle())
+                        // Keeps behavior consistent with Hikari's background validation
+                        .connectionValidator(ConnectionValidator.defaultValidator()) 
+                        .connectionFactoryConfiguration(cf -> cf
+                            .jdbcUrl(cfg.jdbcUrl())
+                            .connectionProviderClassName(cfg.driverClassName()) // "org.postgresql.Driver"
+                            .principal(new NamePrincipal(cfg.username()))
+                            .credential(new SimplePassword(cfg.password()))
+                        )
+                    );
+
+                // Create the GraalVM-safe connection pool
+                AgroalDataSource ds = AgroalDataSource.from(configuration.get());
+                pools.put(shardId, ds);
                 log.info("Created HikariCP pool for shard {}", shardId);
             } catch (Exception e) {
                 log.error("Failed to create pool for shard {}: {}", shardId, e.getMessage(), e);
@@ -77,7 +88,7 @@ public class ShardDataSourceRegistry {
     }
 
     public DataSource getDataSource(String shardId) {
-        HikariDataSource ds = pools.get(shardId);
+        DataSource ds = pools.get(shardId);
         if (ds == null) throw new IllegalArgumentException("No pool configured for shard: " + shardId);
         return ds;
     }
