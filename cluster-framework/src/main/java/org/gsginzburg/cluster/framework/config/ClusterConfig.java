@@ -41,6 +41,12 @@ public interface ClusterConfig {
         String jdbcUrl();
         String username();
         String password();
+        /**
+         * JDBC driver class for the shard pool. Set explicitly so the raw HikariCP
+         * pool loads the driver by class name instead of relying on {@code DriverManager}
+         * service discovery, which is not wired up under GraalVM native image.
+         */
+        @WithDefault("org.postgresql.Driver") String driverClassName();
         @WithDefault("20") int maxPoolSize();
         @WithDefault("5") int minIdle();
     }

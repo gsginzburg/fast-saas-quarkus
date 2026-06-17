@@ -55,6 +55,7 @@ public class ShardDataSourceRegistry {
             try {
                 HikariConfig hikari = new HikariConfig();
                 hikari.setJdbcUrl(cfg.jdbcUrl());
+                hikari.setDriverClassName(cfg.driverClassName());
                 hikari.setUsername(cfg.username());
                 hikari.setPassword(cfg.password());
                 hikari.setMaximumPoolSize(cfg.maxPoolSize());
