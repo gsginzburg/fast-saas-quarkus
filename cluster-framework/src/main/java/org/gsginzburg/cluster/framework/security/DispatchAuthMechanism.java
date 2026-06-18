@@ -29,8 +29,10 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
+import io.quarkus.security.identity.AuthenticationRequestContext;
 import io.quarkus.security.identity.IdentityProviderManager;
 import io.quarkus.security.identity.SecurityIdentity;
+import io.quarkus.security.identity.SecurityIdentityAugmentor;
 import io.quarkus.security.identity.request.AuthenticationRequest;
 import io.quarkus.security.runtime.QuarkusPrincipal;
 import io.quarkus.security.runtime.QuarkusSecurityIdentity;
@@ -42,6 +44,7 @@ import io.vertx.ext.web.RoutingContext;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.gsginzburg.cluster.framework.config.ClusterConfig;
@@ -50,10 +53,12 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.text.ParseException;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 @Slf4j
 @ApplicationScoped
@@ -62,8 +67,27 @@ public class DispatchAuthMechanism implements HttpAuthenticationMechanism {
 
     @Inject ClusterConfig config;
 
+    /** All registered identity augmentors, applied in priority order after the identity is built. */
+    @Inject Instance<SecurityIdentityAugmentor> augmentors;
+
     private ConfigurableJWTProcessor<SecurityContext> jwtProcessor;
     private Cache<String, ValidatedToken> tokenCache;
+    private List<SecurityIdentityAugmentor> sortedAugmentors;
+
+    /**
+     * Minimal context for {@link SecurityIdentityAugmentor#augment}. This mechanism builds the
+     * identity directly instead of going through {@link IdentityProviderManager} (which is what
+     * normally runs augmentors), so they are applied here by hand; any blocking work an augmentor
+     * requests is offloaded to the worker pool.
+     */
+    private static final AuthenticationRequestContext AUGMENT_CONTEXT = new AuthenticationRequestContext() {
+        @Override
+        public Uni<SecurityIdentity> runBlocking(Supplier<SecurityIdentity> function) {
+            // item(Supplier) defers execution to subscription time, which we offload to a worker thread.
+            return Uni.createFrom().<SecurityIdentity>item(function)
+                    .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+        }
+    };
 
     @PostConstruct
     void init() {
@@ -86,6 +110,11 @@ public class DispatchAuthMechanism implements HttpAuthenticationMechanism {
                 .expireAfterAccess(Duration.ofMinutes(30))
                 .maximumSize(10_000)
                 .build();
+
+        // Higher-priority augmentors run first, mirroring IdentityProviderManager ordering.
+        sortedAugmentors = augmentors.stream()
+                .sorted(Comparator.comparingInt(SecurityIdentityAugmentor::priority).reversed())
+                .toList();
     }
 
     @Override
@@ -101,7 +130,7 @@ public class DispatchAuthMechanism implements HttpAuthenticationMechanism {
 
         ValidatedToken cached = tokenCache.getIfPresent(token);
         if (cached != null) {
-            return Uni.createFrom().item(buildIdentity(token, cached, context));
+            return augment(buildIdentity(token, cached, context));
         }
 
         return Uni.createFrom().item(token)
@@ -113,12 +142,35 @@ public class DispatchAuthMechanism implements HttpAuthenticationMechanism {
                     }
                     return vt;
                 })
-                .map(vt -> {
-                    if (vt == null) return null;
-                    return buildIdentity(token, vt, context);
-                })
-                .map(Optional::ofNullable)
-                .onItem().transformToUni(opt -> Uni.createFrom().optional(opt));
+                .flatMap(vt -> {
+                    if (vt == null) {
+                        return Uni.createFrom().optional(Optional.empty());
+                    }
+                    return augment(buildIdentity(token, vt, context));
+                });
+    }
+
+    /**
+     * Applies every registered {@link SecurityIdentityAugmentor} (in priority order) to the freshly
+     * built identity. Because {@link #authenticate} bypasses {@link IdentityProviderManager}, this is
+     * the only place augmentors run for cluster requests — e.g. elevating BACKOFFICE callers.
+     */
+    private Uni<SecurityIdentity> augment(SecurityIdentity identity) {
+        return applyAugmentors(identity, sortedAugmentors);
+    }
+
+    /**
+     * Chains the given augmentors over the identity in list order. Package-private and static so it
+     * can be unit-tested directly, without bootstrapping the mechanism (which needs a live JWKS
+     * endpoint at construction time).
+     */
+    static Uni<SecurityIdentity> applyAugmentors(SecurityIdentity identity,
+                                                 List<SecurityIdentityAugmentor> augmentors) {
+        Uni<SecurityIdentity> result = Uni.createFrom().item(identity);
+        for (SecurityIdentityAugmentor augmentor : augmentors) {
+            result = result.flatMap(si -> augmentor.augment(si, AUGMENT_CONTEXT));
+        }
+        return result;
     }
 
     private ValidatedToken validateLocally(String token) {
