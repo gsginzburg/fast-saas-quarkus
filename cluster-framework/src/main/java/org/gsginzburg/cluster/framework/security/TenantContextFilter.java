@@ -17,6 +17,8 @@
 package org.gsginzburg.cluster.framework.security;
 
 import io.quarkus.security.identity.SecurityIdentity;
+import io.quarkus.vertx.http.runtime.CurrentVertxRequest;
+import io.vertx.ext.web.RoutingContext;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -30,8 +32,11 @@ import org.gsginzburg.cluster.framework.datasource.TenantContextHolder;
 import java.util.ArrayList;
 
 /**
- * Runs on the JBoss worker thread after authentication, reads the tenant ID from the
- * SecurityIdentity, and populates TenantContextHolder so ClusterTenantResolver can find it.
+ * Runs on the JBoss worker thread after authentication and populates TenantContextHolder so
+ * ClusterTenantResolver can find the schema. For authenticated callers the tenant comes off the
+ * SecurityIdentity; for anonymous callers (guest storefront, public reads) it is resolved from the
+ * {@code /c/{base62Id}} path segment that {@link PathTenantRouteFilter} decoded — otherwise guest
+ * requests would have no tenant context and every tenant-scoped query would fail.
  */
 @Provider
 @ApplicationScoped
@@ -40,12 +45,20 @@ public class TenantContextFilter implements ContainerRequestFilter {
 
     @Inject SecurityIdentity securityIdentity;
     @Inject TenantContextHolder tenantContextHolder;
+    @Inject CurrentVertxRequest currentVertxRequest;
 
     @Override
     public void filter(ContainerRequestContext requestContext) {
         tenantContextHolder.clear();
 
         if (securityIdentity.isAnonymous()) {
+            String pathTenantId = pathTenantId();
+            if (pathTenantId != null && !pathTenantId.isBlank()) {
+                tenantContextHolder.set(TenantContext.builder()
+                        .tenantId(pathTenantId)
+                        .roles(new ArrayList<>())
+                        .build());
+            }
             return;
         }
 
@@ -56,5 +69,11 @@ public class TenantContextFilter implements ContainerRequestFilter {
                 .roles(new ArrayList<>(securityIdentity.getRoles()))
                 .build();
         tenantContextHolder.set(ctx);
+    }
+
+    /** The tenant UUID decoded from the {@code /c/{base62Id}} path, or {@code null} if not present. */
+    private String pathTenantId() {
+        RoutingContext rc = currentVertxRequest.getCurrent();
+        return rc != null ? rc.get(PathTenantRouteFilter.ATTRIBUTE) : null;
     }
 }
